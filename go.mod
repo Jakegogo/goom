@@ -1,4 +1,4 @@
-module git.woa.com/goom/mocker
+module github.com/tencent/goom
 
 go 1.16
 

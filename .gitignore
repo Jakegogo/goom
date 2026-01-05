@@ -2,3 +2,5 @@
 *.i64
 *.test
 bazel-*
+.vscode/settings.json
+.vscode/launch.json

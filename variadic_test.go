@@ -4,10 +4,10 @@ import (
 	"errors"
 	"testing"
 
-	"git.woa.com/goom/mocker"
-	"git.woa.com/goom/mocker/arg"
-	"git.woa.com/goom/mocker/test"
 	"github.com/stretchr/testify/suite"
+	"github.com/tencent/goom"
+	"github.com/tencent/goom/arg"
+	"github.com/tencent/goom/test"
 )
 
 func TestNewClients(t *testing.T) {

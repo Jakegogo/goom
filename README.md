@@ -1,7 +1,7 @@
 # GOOM单测Mock框架
 ## 动态
-- 将与外网开源版本保持同步: https://github.com/Tencent/goom
-- 如果未及时响应, 可联系外网的作者进行同步
+- 开源版本将持续进行维护，欢迎提交issue
+- 或者加入QQ群沟通
 
 ## 介绍
 ### 背景
@@ -384,3 +384,5 @@ v1.0.4-rc1
 @yongfuchen、@adrewchen、@bingjgyan、@mingjiehu、@ivyyi、@miliao
 
 
+# QQ群
+<img src="https://github.com/user-attachments/assets/ae5fc289-f47c-45c8-b8c2-688cffe8eda0" alt="扫码加QQ群" width="350" />
