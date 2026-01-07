@@ -157,3 +157,26 @@ func (p *patch) Guard() *Guard {
 	}
 	return p.guard
 }
+
+// registerPatchLocked registers a patch in the global patches map and returns its Guard.
+// Caller must hold the global patch lock.
+func registerPatchLocked(originPtr uintptr, jumpBytes []byte, fixOriginPtr uintptr) (*Guard, error) {
+	if _, ok := patches[originPtr]; ok {
+		unpatchValue(originPtr)
+	}
+
+	originBytes, err := checkAndReadOriginBytes(originPtr, len(jumpBytes))
+	if err != nil {
+		return nil, err
+	}
+
+	p := &patch{
+		originPtr:    originPtr,
+		originBytes:  originBytes,
+		jumpBytes:    jumpBytes,
+		fixOriginPtr: fixOriginPtr,
+	}
+	patches[originPtr] = p
+	bytecode.PrintInst("origin >>>>> ", originPtr, bytecode.PrintShort, logger.DebugLevel)
+	return p.Guard(), nil
+}

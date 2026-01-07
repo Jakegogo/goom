@@ -6,6 +6,7 @@ import (
 
 	"github.com/tencent/goom/internal/bytecode"
 	"github.com/tencent/goom/internal/bytecode/memory"
+	"github.com/tencent/goom/internal/bytecode/stub"
 	"github.com/tencent/goom/internal/logger"
 )
 
@@ -88,4 +89,53 @@ func fixOriginFuncToTrampoline(origin uintptr, trampoline uintptr, jumpInstSize 
 		trampoline, bytecode.PrintMiddle, logger.DebugLevel)
 	logger.Debugf("copy to trampoline %x ", trampoline)
 	return trampoline, nil
+}
+
+// buildFixOriginTrampoline builds a trampoline that:
+// - copies enough bytes from origin to cover jumpInstSize (and potentially more due to instruction boundaries)
+// - fixes PC-relative instructions for the new location
+// - appends a jump back to origin+copiedBytes
+//
+// The returned pointer is the executable entry address of the trampoline.
+func buildFixOriginTrampoline(origin uintptr, jumpInstSize int) (uintptr, error) {
+	// IMPORTANT:
+	// The trampoline is executed as part of the original call path. If it lives in an
+	// anonymous mmap region, it has no Go func metadata (pcdata/stack maps), and async
+	// preemption/GC stack scanning can observe an "unknown PC" and break invariants.
+	//
+	// Therefore we *force* allocating from the in-binary placeholder region (which is
+	// inside a real Go function body and has runtime metadata).
+	//
+	// If the placeholder space is exhausted, callers should fall back to Unpatch/Restore
+	// rather than executing a metadata-free trampoline.
+	space, err := stub.AcquireFromHolder(2048)
+	if err != nil {
+		return 0, err
+	}
+
+	originFuncSize, err := bytecode.GetFuncSize(defaultArchMod, origin, false)
+	if err != nil {
+		logger.Warningf("buildFixOriginTrampoline GetFuncSize error: %v", err)
+		originFuncSize = defaultFuncSize
+	}
+
+	originData := memory.RawRead(origin, originFuncSize)
+	fixedData, fixedDataSize, err := fixRelativeAddr(origin, originData, space.Addr, originFuncSize, jumpInstSize)
+	if err != nil {
+		return 0, err
+	}
+
+	// Append jump back to origin after the copied block.
+	jumpBack := jmpToOriginFunctionValue(space.Addr+uintptr(len(fixedData)), origin+uintptr(fixedDataSize))
+	code := append(fixedData, jumpBack...)
+
+	if err := stub.Write(space, code); err != nil {
+		return 0, err
+	}
+	logger.Debugf("buildFixOriginTrampoline origin=0x%x tramp=0x%x copied=%d out=%d", origin, space.Addr, fixedDataSize, len(code))
+
+	if space.Addr == 0 {
+		return 0, fmt.Errorf("buildFixOriginTrampoline: got zero trampoline address")
+	}
+	return space.Addr, nil
 }

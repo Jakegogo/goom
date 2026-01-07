@@ -48,17 +48,21 @@ func fixBlockArm64(from uintptr, block []byte, trampoline uintptr,
 		limit = blockSize
 	}
 
+	outPos := uintptr(0)
 	for pos := 0; pos+arm64InsnLen <= limit; pos += arm64InsnLen {
 		insWord := binary.LittleEndian.Uint32(block[pos : pos+arm64InsnLen])
 
-		newWord, rewritten, e := rewritePCRelArm64(insWord, from+uintptr(pos), trampoline+uintptr(pos))
+		outWords, rewritten, e := rewritePCRelArm64Seq(insWord, from+uintptr(pos), trampoline+outPos)
 		if e != nil {
 			return nil, 0, e
 		}
 
+		for _, w := range outWords {
 		out := make([]byte, 4)
-		binary.LittleEndian.PutUint32(out, newWord)
+			binary.LittleEndian.PutUint32(out, w)
 		fixedBlock = append(fixedBlock, out...)
+			outPos += arm64InsnLen
+		}
 
 		// debug print
 		if logger.LogLevel <= logger.DebugLevel {
@@ -68,7 +72,7 @@ func fixBlockArm64(from uintptr, block []byte, trampoline uintptr,
 				if rewritten {
 					logger.Debugf("[4]>[4] 0x%x:\t%s\t\t%-30s\t\t%s\t\t(rewritten: %s)",
 						(uint64)(from)+uint64(pos), ins.Op, ins.String(), hex.EncodeToString(code),
-						hex.EncodeToString(out))
+						hex.EncodeToString(fixedBlock[len(fixedBlock)-arm64InsnLen:]))
 				} else {
 					logger.Debugf("[4]>[4] 0x%x:\t%s\t\t%-30s\t\t%s",
 						(uint64)(from)+uint64(pos), ins.Op, ins.String(), hex.EncodeToString(code))
@@ -121,19 +125,22 @@ func checkJumpBetweenArm64(from uintptr, to int, originData []byte, funcSize int
 	return nil
 }
 
-func rewritePCRelArm64(word uint32, originPC uintptr, trampPC uintptr) (newWord uint32, rewritten bool, err error) {
+func rewritePCRelArm64Seq(word uint32, originPC uintptr, trampPC uintptr) (out []uint32, rewritten bool, err error) {
 	// B / BL
 	if isBArm64(word) || isBLArm64(word) {
 		target := int64(originPC) + int64(signExtend(word&0x03FFFFFF, 26)<<2)
 		imm := (target - int64(trampPC)) >> 2
 		if (target-int64(trampPC))%4 != 0 {
-			return 0, false, fmt.Errorf("arm64 branch target not aligned: originPC=0x%x trampPC=0x%x", originPC, trampPC)
+			return nil, false, fmt.Errorf("arm64 branch target not aligned: originPC=0x%x trampPC=0x%x", originPC, trampPC)
 		}
 		if imm < -(1<<25) || imm >= (1<<25) {
-			return 0, false, fmt.Errorf("arm64 B/BL out of range after relocation: originPC=0x%x trampPC=0x%x target=0x%x",
-				originPC, trampPC, uintptr(target))
+			// Long branch/call: load absolute target into x16 then BR/BLR x16.
+			seq := append(loadAddrToX16(uintptr(target)),
+				branchRegX16(isBLArm64(word)),
+			)
+			return seq, true, nil
 		}
-		return (word & 0xFC000000) | (uint32(imm) & 0x03FFFFFF), true, nil
+		return []uint32{(word & 0xFC000000) | (uint32(imm) & 0x03FFFFFF)}, true, nil
 	}
 
 	// B.cond
@@ -143,14 +150,27 @@ func rewritePCRelArm64(word uint32, originPC uintptr, trampPC uintptr) (newWord 
 		target := int64(originPC) + rel
 		newRel := target - int64(trampPC)
 		if newRel%4 != 0 {
-			return 0, false, fmt.Errorf("arm64 B.cond target not aligned after relocation")
+			return nil, false, fmt.Errorf("arm64 B.cond target not aligned after relocation")
 		}
 		newImm := newRel >> 2
 		if newImm < -(1<<18) || newImm >= (1<<18) {
-			return 0, false, fmt.Errorf("arm64 B.cond out of range after relocation: originPC=0x%x trampPC=0x%x target=0x%x",
-				originPC, trampPC, uintptr(target))
+			// Expand:
+			//   B.<!cond> +24
+			//   MOVZ/MOVK x16, target
+			//   BR x16
+			cond := uint32(word & 0xF)
+			inv, ok := invertCond(cond)
+			if !ok {
+				return nil, false, fmt.Errorf("arm64 B.cond illegal condition after relocation: cond=%d", cond)
+			}
+			skipWords := int64((1 + 5) * arm64InsnLen / arm64InsnLen) // 6 words total = 24 bytes
+			br := setImm19AndCond(word, skipWords, inv)
+			seq := []uint32{br}
+			seq = append(seq, loadAddrToX16(uintptr(target))...)
+			seq = append(seq, branchRegX16(false))
+			return seq, true, nil
 		}
-		return (word &^ 0x00FFFFE0) | ((uint32(newImm) & 0x7FFFF) << 5), true, nil
+		return []uint32{(word &^ 0x00FFFFE0) | ((uint32(newImm) & 0x7FFFF) << 5)}, true, nil
 	}
 
 	// CBZ / CBNZ
@@ -160,14 +180,20 @@ func rewritePCRelArm64(word uint32, originPC uintptr, trampPC uintptr) (newWord 
 		target := int64(originPC) + rel
 		newRel := target - int64(trampPC)
 		if newRel%4 != 0 {
-			return 0, false, fmt.Errorf("arm64 CBZ/CBNZ target not aligned after relocation")
+			return nil, false, fmt.Errorf("arm64 CBZ/CBNZ target not aligned after relocation")
 		}
 		newImm := newRel >> 2
 		if newImm < -(1<<18) || newImm >= (1<<18) {
-			return 0, false, fmt.Errorf("arm64 CBZ/CBNZ out of range after relocation: originPC=0x%x trampPC=0x%x target=0x%x",
-				originPC, trampPC, uintptr(target))
+			// Expand using inverted CBZ/CBNZ to skip a long branch.
+			skipWords := int64((1 + 5) * arm64InsnLen / arm64InsnLen) // 24 bytes
+			inv := invertCBZCBNZ(word)
+			inv = setImm19(inv, skipWords)
+			seq := []uint32{inv}
+			seq = append(seq, loadAddrToX16(uintptr(target))...)
+			seq = append(seq, branchRegX16(false))
+			return seq, true, nil
 		}
-		return (word &^ 0x00FFFFE0) | ((uint32(newImm) & 0x7FFFF) << 5), true, nil
+		return []uint32{(word &^ 0x00FFFFE0) | ((uint32(newImm) & 0x7FFFF) << 5)}, true, nil
 	}
 
 	// TBZ / TBNZ
@@ -177,14 +203,20 @@ func rewritePCRelArm64(word uint32, originPC uintptr, trampPC uintptr) (newWord 
 		target := int64(originPC) + rel
 		newRel := target - int64(trampPC)
 		if newRel%4 != 0 {
-			return 0, false, fmt.Errorf("arm64 TBZ/TBNZ target not aligned after relocation")
+			return nil, false, fmt.Errorf("arm64 TBZ/TBNZ target not aligned after relocation")
 		}
 		newImm := newRel >> 2
 		if newImm < -(1<<13) || newImm >= (1<<13) {
-			return 0, false, fmt.Errorf("arm64 TBZ/TBNZ out of range after relocation: originPC=0x%x trampPC=0x%x target=0x%x",
-				originPC, trampPC, uintptr(target))
+			// Expand using inverted TBZ/TBNZ to skip a long branch.
+			skipWords := int64((1 + 5) * arm64InsnLen / arm64InsnLen) // 24 bytes
+			inv := invertTBZTBNZ(word)
+			inv = setImm14(inv, skipWords)
+			seq := []uint32{inv}
+			seq = append(seq, loadAddrToX16(uintptr(target))...)
+			seq = append(seq, branchRegX16(false))
+			return seq, true, nil
 		}
-		return (word &^ 0x0007FFE0) | ((uint32(newImm) & 0x3FFF) << 5), true, nil
+		return []uint32{(word &^ 0x0007FFE0) | ((uint32(newImm) & 0x3FFF) << 5)}, true, nil
 	}
 
 	// ADR
@@ -193,10 +225,10 @@ func rewritePCRelArm64(word uint32, originPC uintptr, trampPC uintptr) (newWord 
 		target := int64(originPC) + imm
 		newImm := target - int64(trampPC)
 		if newImm < -(1<<20) || newImm >= (1<<20) {
-			return 0, false, fmt.Errorf("arm64 ADR out of range after relocation: originPC=0x%x trampPC=0x%x target=0x%x",
+			return nil, false, fmt.Errorf("arm64 ADR out of range after relocation: originPC=0x%x trampPC=0x%x target=0x%x",
 				originPC, trampPC, uintptr(target))
 		}
-		return encodeImmHiLo21(word, newImm), true, nil
+		return []uint32{encodeImmHiLo21(word, newImm)}, true, nil
 	}
 
 	// ADRP (page relative)
@@ -208,13 +240,13 @@ func rewritePCRelArm64(word uint32, originPC uintptr, trampPC uintptr) (newWord 
 		trampPage := int64(trampPC) &^ 0xFFF
 		newPageDelta := (targetPage - trampPage) >> 12
 		if (targetPage-trampPage)%4096 != 0 {
-			return 0, false, fmt.Errorf("arm64 ADRP page delta not aligned after relocation")
+			return nil, false, fmt.Errorf("arm64 ADRP page delta not aligned after relocation")
 		}
 		if newPageDelta < -(1<<20) || newPageDelta >= (1<<20) {
-			return 0, false, fmt.Errorf("arm64 ADRP out of range after relocation: originPC=0x%x trampPC=0x%x targetPage=0x%x",
+			return nil, false, fmt.Errorf("arm64 ADRP out of range after relocation: originPC=0x%x trampPC=0x%x targetPage=0x%x",
 				originPC, trampPC, uintptr(targetPage))
 		}
-		return encodeImmHiLo21(word, newPageDelta), true, nil
+		return []uint32{encodeImmHiLo21(word, newPageDelta)}, true, nil
 	}
 
 	// LDR (literal) / LDRSW (literal) / PRFM (literal): imm19<<2, base is current PC.
@@ -225,17 +257,95 @@ func rewritePCRelArm64(word uint32, originPC uintptr, trampPC uintptr) (newWord 
 		target := int64(originPC) + rel
 		newRel := target - int64(trampPC)
 		if newRel%4 != 0 {
-			return 0, false, fmt.Errorf("arm64 literal-imm19 target not aligned after relocation")
+			return nil, false, fmt.Errorf("arm64 literal-imm19 target not aligned after relocation")
 		}
 		newImm := newRel >> 2
 		if newImm < -(1<<18) || newImm >= (1<<18) {
-			return 0, false, fmt.Errorf("arm64 literal-imm19 out of range after relocation: originPC=0x%x trampPC=0x%x target=0x%x",
+			return nil, false, fmt.Errorf("arm64 literal-imm19 out of range after relocation: originPC=0x%x trampPC=0x%x target=0x%x",
 				originPC, trampPC, uintptr(target))
 		}
-		return (word &^ 0x00FFFFE0) | ((uint32(newImm) & 0x7FFFF) << 5), true, nil
+		return []uint32{(word &^ 0x00FFFFE0) | ((uint32(newImm) & 0x7FFFF) << 5)}, true, nil
 	}
 
-	return word, false, nil
+	return []uint32{word}, false, nil
+}
+
+// --- long branch helpers (arm64) ---
+
+const (
+	arm64MovConst = 37 // 0b100101
+	arm64SF       = 1  // 64-bit
+	arm64MOVZ     = 2  // 0b10
+	arm64MOVK     = 3  // 0b11
+)
+
+func movImmToReg(rd uint32, opc, shift int, val uintptr) uint32 {
+	var m uint32 = rd
+	m |= uint32(val&0xFFFF) << 5
+	m |= uint32(shift&3) << 21
+	m |= arm64MovConst << 23
+	m |= uint32(opc&0x3) << 29
+	m |= arm64SF << 31
+	return m
+}
+
+func loadAddrToX16(addr uintptr) []uint32 {
+	d0d1 := addr & 0xFFFF
+	d2d3 := (addr >> 16) & 0xFFFF
+	d4d5 := (addr >> 32) & 0xFFFF
+	d6d7 := (addr >> 48) & 0xFFFF
+	return []uint32{
+		movImmToReg(16, arm64MOVZ, 0, d0d1),
+		movImmToReg(16, arm64MOVK, 1, d2d3),
+		movImmToReg(16, arm64MOVK, 2, d4d5),
+		movImmToReg(16, arm64MOVK, 3, d6d7),
+	}
+}
+
+func branchRegX16(withLink bool) uint32 {
+	// BR  Xn  = 0xD61F0000 | (n<<5)
+	// BLR Xn  = 0xD63F0000 | (n<<5)
+	base := uint32(0xD61F0000)
+	if withLink {
+		base = 0xD63F0000
+	}
+	return base | (16 << 5)
+}
+
+func invertCond(cond uint32) (uint32, bool) {
+	// For condition codes 0..13, the inverse is cond^1.
+	if cond <= 13 {
+		return cond ^ 1, true
+	}
+	return 0, false
+}
+
+func setImm19AndCond(word uint32, imm19 int64, cond uint32) uint32 {
+	// imm19 is in words (not bytes), fits in signed 19-bit.
+	u := uint32(imm19) & 0x7FFFF
+	word = (word &^ 0x00FFFFE0) | (u << 5)
+	word = (word &^ 0xF) | (cond & 0xF)
+	return word
+}
+
+func setImm19(word uint32, imm19 int64) uint32 {
+	u := uint32(imm19) & 0x7FFFF
+	return (word &^ 0x00FFFFE0) | (u << 5)
+}
+
+func setImm14(word uint32, imm14 int64) uint32 {
+	u := uint32(imm14) & 0x3FFF
+	return (word &^ 0x0007FFE0) | (u << 5)
+}
+
+func invertCBZCBNZ(word uint32) uint32 {
+	// CBZ <-> CBNZ differ by bit 24.
+	return word ^ 0x01000000
+}
+
+func invertTBZTBNZ(word uint32) uint32 {
+	// TBZ <-> TBNZ differ by bit 24.
+	return word ^ 0x01000000
 }
 
 func signExtend(v uint32, bits uint) int64 {

@@ -1,0 +1,49 @@
+goom-mocker logFileLocation: /Users/jake/logs/goom-mocker.log
+goos: darwin
+goarch: arm64
+pkg: github.com/tencent/goom/internal/argdump
+cpu: Apple M1 Max
+Benchmark_Unpatched_Add-10                        	957862686	         1.142 ns/op	       0 B/op	       0 allocs/op
+Benchmark_Unpatched_Add-10                        	1000000000	         1.121 ns/op	       0 B/op	       0 allocs/op
+Benchmark_Unpatched_Add-10                        	1000000000	         1.125 ns/op	       0 B/op	       0 allocs/op
+Benchmark_Unpatched_Add-10                        	1000000000	         1.121 ns/op	       0 B/op	       0 allocs/op
+Benchmark_Unpatched_Add-10                        	1000000000	         1.165 ns/op	       0 B/op	       0 allocs/op
+Benchmark_Unpatched_Add-10                        	1000000000	         1.125 ns/op	       0 B/op	       0 allocs/op
+Benchmark_Unpatched_Add-10                        	1000000000	         1.197 ns/op	       0 B/op	       0 allocs/op
+Benchmark_Patched_Add_DumpToDevNull-10            	  373491	      3162 ns/op	     785 B/op	      30 allocs/op
+Benchmark_Patched_Add_DumpToDevNull-10            	  380832	      3163 ns/op	     785 B/op	      30 allocs/op
+Benchmark_Patched_Add_DumpToDevNull-10            	  112442	     10534 ns/op	     865 B/op	      34 allocs/op
+Benchmark_Patched_Add_DumpToDevNull-10            	  115243	     10432 ns/op	     865 B/op	      34 allocs/op
+Benchmark_Patched_Add_DumpToDevNull-10            	  113955	     10431 ns/op	     865 B/op	      34 allocs/op
+Benchmark_Patched_Add_DumpToDevNull-10            	  115914	     10567 ns/op	     865 B/op	      34 allocs/op
+Benchmark_Patched_Add_DumpToDevNull-10            	  113588	     10637 ns/op	     865 B/op	      34 allocs/op
+Benchmark_Patched_Add_NoDump-10                   	  156326	      7501 ns/op	      80 B/op	       4 allocs/op
+Benchmark_Patched_Add_NoDump-10                   	  157866	      7504 ns/op	      80 B/op	       4 allocs/op
+Benchmark_Patched_Add_NoDump-10                   	  157483	      7499 ns/op	      80 B/op	       4 allocs/op
+Benchmark_Patched_Add_NoDump-10                   	  156476	      7953 ns/op	      80 B/op	       4 allocs/op
+Benchmark_Patched_Add_NoDump-10                   	  132571	      9092 ns/op	      80 B/op	       4 allocs/op
+Benchmark_Patched_Add_NoDump-10                   	  136516	      8116 ns/op	      80 B/op	       4 allocs/op
+Benchmark_Patched_Add_NoDump-10                   	  134780	      8441 ns/op	      80 B/op	       4 allocs/op
+Benchmark_Unpatched_MultiReturn-10                	55621327	        21.60 ns/op	       3 B/op	       1 allocs/op
+Benchmark_Unpatched_MultiReturn-10                	55788547	        21.65 ns/op	       3 B/op	       1 allocs/op
+Benchmark_Unpatched_MultiReturn-10                	52668733	        21.96 ns/op	       3 B/op	       1 allocs/op
+Benchmark_Unpatched_MultiReturn-10                	54404906	        22.59 ns/op	       3 B/op	       1 allocs/op
+Benchmark_Unpatched_MultiReturn-10                	54532440	        21.70 ns/op	       3 B/op	       1 allocs/op
+Benchmark_Unpatched_MultiReturn-10                	55312071	        21.66 ns/op	       3 B/op	       1 allocs/op
+Benchmark_Unpatched_MultiReturn-10                	54598605	        21.58 ns/op	       3 B/op	       1 allocs/op
+Benchmark_Patched_MultiReturn_DumpToDevNull-10    	  100101	     12187 ns/op	    1057 B/op	      40 allocs/op
+Benchmark_Patched_MultiReturn_DumpToDevNull-10    	   96019	     12130 ns/op	    1057 B/op	      40 allocs/op
+Benchmark_Patched_MultiReturn_DumpToDevNull-10    	   96668	     14158 ns/op	    1057 B/op	      40 allocs/op
+Benchmark_Patched_MultiReturn_DumpToDevNull-10    	   96643	     12059 ns/op	    1057 B/op	      40 allocs/op
+Benchmark_Patched_MultiReturn_DumpToDevNull-10    	  101205	     12036 ns/op	    1057 B/op	      40 allocs/op
+Benchmark_Patched_MultiReturn_DumpToDevNull-10    	   98082	     11854 ns/op	    1057 B/op	      40 allocs/op
+Benchmark_Patched_MultiReturn_DumpToDevNull-10    	   97706	     12262 ns/op	    1057 B/op	      40 allocs/op
+Benchmark_Patched_MultiReturn_NoDump-10           	  148467	      8261 ns/op	      80 B/op	       4 allocs/op
+Benchmark_Patched_MultiReturn_NoDump-10           	  156106	      8543 ns/op	      80 B/op	       4 allocs/op
+Benchmark_Patched_MultiReturn_NoDump-10           	  153216	      7872 ns/op	      80 B/op	       4 allocs/op
+Benchmark_Patched_MultiReturn_NoDump-10           	  138399	      7798 ns/op	      80 B/op	       4 allocs/op
+Benchmark_Patched_MultiReturn_NoDump-10           	  139936	      8182 ns/op	      80 B/op	       4 allocs/op
+Benchmark_Patched_MultiReturn_NoDump-10           	  149670	      7974 ns/op	      80 B/op	       4 allocs/op
+Benchmark_Patched_MultiReturn_NoDump-10           	  145297	      8559 ns/op	      80 B/op	       4 allocs/op
+PASS
+ok  	github.com/tencent/goom/internal/argdump	53.754s

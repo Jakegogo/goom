@@ -41,6 +41,21 @@ func Acquire(spaceLen int) (*Space, error) {
 	}
 }
 
+// AcquireFromHolder forces allocating executable space from the in-binary placeholder
+// region instead of using mmap. This is useful on platforms where W^X/JIT restrictions
+// make RWX mmap regions non-executable at runtime.
+func AcquireFromHolder(spaceLen int) (*Space, error) {
+	addr, space, err := acquireFromHolder(spaceLen)
+	if err != nil {
+		return nil, err
+	}
+	return &Space{
+		Addr:  addr,
+		Space: space,
+		typ:   TypeHolder,
+	}, nil
+}
+
 // Write 写入数据
 func Write(s *Space, data []byte) error {
 	switch s.typ {

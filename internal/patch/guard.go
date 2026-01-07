@@ -65,3 +65,8 @@ func (g *Guard) Restore() {
 func (g *Guard) FixOriginFunc() uintptr {
 	return g.fixOriginPtr
 }
+
+// OriginFunc returns the address that this guard patched (the function entry).
+func (g *Guard) OriginFunc() uintptr {
+	return g.origin
+}
