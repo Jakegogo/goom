@@ -1,5 +1,5 @@
-//go:build !windows
-// +build !windows
+//go:build !windows && go1.21
+// +build !windows,go1.21
 
 package memory
 
@@ -12,7 +12,7 @@ import (
 	"github.com/tencent/goom/internal/unexports2"
 )
 
-type stopTheWorldFn func(string)
+type stopTheWorldFn func(uint8)
 type startTheWorldFn func()
 
 var (
@@ -37,8 +37,10 @@ func initStopTheWorld() {
 func stopTheWorld(reason string) {
 	stopOnce.Do(initStopTheWorld)
 	if stopFn != nil {
-		stopFn(reason)
+		// go1.21+ expects stwReason (uint8). 0 is a safe generic value.
+		stopFn(0)
 	}
+	_ = reason
 }
 
 func startTheWorld() {
