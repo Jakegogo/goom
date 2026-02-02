@@ -1,4 +1,5 @@
 //go:build go1.24 && arm64
+// +build go1.24,arm64
 
 package argdump_test
 
@@ -45,7 +46,7 @@ func captureStdout(t *testing.T, fn func()) string {
 	return buf.String()
 }
 
-func captureStdoutRecover(t *testing.T, fn func()) (out string, recovered any) {
+func captureStdoutRecover(t *testing.T, fn func()) (out string, recovered interface{}) {
 	t.Helper()
 
 	old := os.Stdout

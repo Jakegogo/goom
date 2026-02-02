@@ -9,7 +9,8 @@ import (
 const nopOpcode byte = 0x90
 
 // jmpToFunctionValue Assembles a jump to a function value
-func jmpToFunctionValue(from, to uintptr) (value []byte) {
+func jmpToFunctionValue(from, to uintptr, replacementCode uintptr) (value []byte) {
+	_ = replacementCode
 	// Prefer a short RIP-relative indirect jump when the func value pointer is close enough.
 	// Encoding: NOP; JMP QWORD PTR [RIP+disp32]
 	//   90

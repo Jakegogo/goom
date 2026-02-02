@@ -1,4 +1,5 @@
-//go:build go1.24 && arm64
+//go:build go1.13
+// +build go1.13
 
 package abijson
 
@@ -27,7 +28,7 @@ func rtypePtr(t reflect.Type) *abiType {
 // reflectTypeFromRType builds a reflect.Type from a runtime type pointer.
 // This avoids reflect.Value and avoids any linkname.
 func reflectTypeFromRType(rt *abiType) reflect.Type {
-	// Any reflect.Type value gives us the correct itab for the concrete type (*rtype).
+	// Any reflect.Type value gives us the correct itab for the concrete type (*rtype / *abi.Type).
 	var sample reflect.Type = reflect.TypeOf(int(0))
 	it := (*iface)(unsafe.Pointer(&sample)).tab
 	out := iface{tab: it, data: unsafe.Pointer(rt)}
@@ -62,11 +63,8 @@ func readInterface(it reflect.Type, addr unsafe.Pointer) (reflect.Type, unsafe.P
 		return nil, nil, false
 	}
 
-	// itab layout is runtime-private; in go1.24 itab starts with:
-	//   Inter *interfacetype
-	//   Type  *_type
-	// So Type is at +ptrSize.
-	typPtr := *(*unsafe.Pointer)(unsafe.Add(iv.tab, unsafe.Sizeof(uintptr(0))))
+	// itab layout is runtime-private; it has (inter, _type, hash, ...) so _type is at +ptrSize.
+	typPtr := *(*unsafe.Pointer)(unsafe.Pointer(uintptr(iv.tab) + unsafe.Sizeof(uintptr(0))))
 	if typPtr == nil {
 		return nil, nil, false
 	}

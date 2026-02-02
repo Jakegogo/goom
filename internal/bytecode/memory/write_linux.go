@@ -1,0 +1,5 @@
+//go:build linux && (amd64 || arm64)
+// +build linux
+// +build amd64 arm64
+
+package memory

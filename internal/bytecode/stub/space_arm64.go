@@ -41,7 +41,9 @@ func WriteICacheFn(data []byte) (uintptr, error) {
 	}
 	switch s.typ {
 	case TypeMMap:
-		copy(*s.Space, data[:])
+		if err := writeToMMap(s.Addr, s.Space, data); err != nil {
+			return 0, err
+		}
 		return s.Addr, nil
 	case TypeHolder:
 		return s.Addr, memory.WriteToNoFlushNoLock(s.Addr, data)
@@ -52,14 +54,12 @@ func WriteICacheFn(data []byte) (uintptr, error) {
 
 // acquireICacheFn 获取 icache 执行空间
 func acquireICacheFn() (*Space, error) {
-	if addr, space, err := acquireFromMMap(spaceLen); err == nil {
-		return &Space{
-			Addr:  addr,
-			Space: space,
-			typ:   TypeMMap,
-		}, nil
-	}
-
+	// IMPORTANT (darwin/arm64 stability):
+	// The ClearICache helper is used by write paths that may themselves be allocating/writing
+	// executable memory. Allocating the ClearICache helper via mmap would introduce a bootstrap
+	// problem (we'd need ClearICache to safely finalize/expose executable code).
+	//
+	// Therefore we always use the in-binary holder region for the ClearICache helper.
 	return &Space{
 		Addr:  iCacheHolderAddr,
 		Space: nil,

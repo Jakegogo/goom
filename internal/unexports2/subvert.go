@@ -35,6 +35,9 @@ import (
 //	    fmt.Printf("Result of reflect.methodName: %v\n", f())
 //	}
 func ExposeFunction(funcSymName string, templateFunc interface{}) (function interface{}, err error) {
+	// Ensure funcAlignment is initialized (symbol-table entry addresses are not the same as runtime memory addresses).
+	// Without this, we may build a function value with an invalid code pointer and crash on call.
+	initAlignment.Do(initAlignmentFunc)
 	fn, err := getFunctionSymbolByName(funcSymName)
 	if err != nil {
 		return

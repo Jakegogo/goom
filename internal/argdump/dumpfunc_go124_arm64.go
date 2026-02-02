@@ -1,4 +1,5 @@
-//go:build go1.24 && arm64
+//go:build go1.18 && arm64
+// +build go1.18,arm64
 
 package argdump
 
@@ -25,20 +26,17 @@ import (
 //
 // Important: It does not use reflect.Value to access arguments.
 //
-// Implementation strategy (go1.24+arm64):
+// Implementation strategy (go1.18+arm64; originally validated on go1.24+arm64):
 // - Reuse stdlib reflect.makeFuncStub so runtime stack maps work (see runtime/stkframe.go special-case).
 // - Patch reflect.callReflect to our hook. The hook recognizes our generated closures and dumps args.
 //   For any other closure, it delegates to the original reflect.callReflect via trampoline.
+//
+// Key stability note:
+// - On go1.18+ arm64, reflect.makeFuncStub spills reg args into an abi.RegArgs area and passes a regs pointer
+//   into callReflect/callDump. Our hook must match that ABI and must not corrupt the funcval context register (x26),
+//   otherwise reflect.callReflect can crash deep in reflect.funcLayout / runtime type metadata.
 
-const (
-	// internal/abi constants for go1.24 arm64.
-	intArgRegs   = 16
-	floatArgRegs = 16
-	floatRegSize = uintptr(8)
-	ptrSize      = uintptr(unsafe.Sizeof(uintptr(0)))
-)
-
-// intArgRegBitmap matches internal/abi.IntArgRegBitmap for go1.24 arm64.
+// intArgRegBitmap matches internal/abi.IntArgRegBitmap.
 type intArgRegBitmap [(intArgRegs + 7) / 8]uint8
 
 func (b *intArgRegBitmap) Set(i int) { b[i/8] |= uint8(1) << (i % 8) }
@@ -46,7 +44,7 @@ func (b *intArgRegBitmap) Get(i int) bool {
 	return b[i/8]&(uint8(1)<<(i%8)) != 0
 }
 
-// regArgs matches internal/abi.RegArgs for go1.24 arm64 (layout-sensitive).
+// regArgs matches internal/abi.RegArgs (layout-sensitive).
 type regArgs struct {
 	Ints   [intArgRegs]uintptr
 	Floats [floatArgRegs]uint64
@@ -57,7 +55,7 @@ type regArgs struct {
 }
 
 func (r *regArgs) intRegArgAddr(reg int, argSize uintptr) unsafe.Pointer {
-	// arm64 is little-endian; no sub-word offset required.
+	// All target platforms here are little-endian; no sub-word offset required.
 	return unsafe.Pointer(&r.Ints[reg])
 }
 
@@ -100,7 +98,7 @@ type dumpFuncImpl struct {
 	// origin function, call it via runtime.reflectcall, then restore the patch.
 	hookGuard      *patch.Guard
 	origFuncVal    unsafe.Pointer // *runtime.FuncVal (pointer-authenticated on arm64e)
-	origFuncValBox any            // keeps trampoline funcval alive on heap (avoid dangling pointers)
+	origFuncValBox interface{}    // keeps trampoline funcval alive on heap (avoid dangling pointers)
 	useTrampoline  bool           // call orig via hookGuard.FixOriginFunc trampoline (no Unpatch/Restore)
 	stackArgsSz    uint32
 	stackRetOff    uint32
@@ -112,6 +110,8 @@ var (
 
 	// trampoline to the original reflect.callReflect, populated after patching.
 	origCallReflect func(ctxt unsafe.Pointer, frame unsafe.Pointer, retValid *bool, regs unsafe.Pointer)
+	// callDumpFuncVal keeps the patched target funcval alive (GC does not see text immediates).
+	callDumpFuncVal func(ctxt unsafe.Pointer, frame unsafe.Pointer, retValid *bool, regs unsafe.Pointer)
 
 	// sentinel used for dumpFuncImpl.magic.
 	magicSentinel = new(int)
@@ -146,7 +146,7 @@ var DumpEnabled = true
 // The returned interface{} has dynamic type == typ (so it can be type-asserted).
 //
 // The generated function prints all arguments as JSON and returns zero values.
-func MakeDumpFunc(typ reflect.Type) any {
+func MakeDumpFunc(typ reflect.Type) interface{} {
 	if typ == nil || typ.Kind() != reflect.Func {
 		panic("argdump: typ must be a non-nil func type")
 	}
@@ -176,25 +176,28 @@ func MakeDumpFunc(typ reflect.Type) any {
 
 func ensureCallReflectPatched() {
 	patchOnce.Do(func() {
-		// Critical: reflect.makeFuncStub.abi0 calls reflect.callReflect.abi0 (ABI0 wrapper),
-		// and that wrapper CALLs the ABIInternal implementation.
-		//
-		// If we accidentally patch the ABI0 wrapper, callDump will be invoked with the wrong ABI
-		// (args on stack), making `ctxt` look like a stack pointer and `magic` read as 0/random.
-		//
-		// Therefore, prefer resolving the ABIInternal target by decoding the wrapper’s inner call.
+		// Critical: patch the ABIInternal implementation of reflect.callReflect.
+		// Prefer decoding an explicit ABI0 wrapper symbol if present; otherwise use the
+		// ABIInternal symbol directly. Avoid resolving via makeFuncStub because its
+		// first call site is runtime.spillArgs on go1.18-go1.23.
 		callReflectPtr := uintptr(0)
 		if callReflectAbi0Ptr, e := unexports2.FindFuncByName("reflect.callReflect.abi0"); e == nil && callReflectAbi0Ptr != 0 {
 			if inner, e2 := bytecode.GetInnerFunc(0, callReflectAbi0Ptr); e2 == nil && inner != 0 && inner != callReflectAbi0Ptr {
 				callReflectPtr = inner
 			}
+			if DebugEnabled {
+				_, _ = fmt.Fprintf(os.Stderr, "[argdump] resolve callReflect.abi0=0x%x inner=0x%x\n", callReflectAbi0Ptr, callReflectPtr)
+			}
 		}
+		// Otherwise, patch reflect.callReflect directly.
 		if callReflectPtr == 0 {
-			// Fallback: patch the symbol directly (some builds may omit the abi0 wrapper symbol).
-			var err error
-			callReflectPtr, err = unexports2.FindFuncByName("reflect.callReflect")
+			p, err := unexports2.FindFuncByName("reflect.callReflect")
 			if err != nil {
 				panic(err)
+			}
+			callReflectPtr = p
+			if DebugEnabled {
+				_, _ = fmt.Fprintf(os.Stderr, "[argdump] resolve callReflect=0x%x\n", p)
 			}
 		}
 		DebugCallReflectPtr = callReflectPtr
@@ -214,13 +217,19 @@ func ensureCallReflectPatched() {
 		// Prepare a trampoline before applying the patch.
 		// Important: creating origCallReflect via reflect.MakeFunc would recurse back into callReflect,
 		// so we must create origCallReflect (pointing at the fixed origin) BEFORE guard.Apply().
-		guard, err := patch.PtrTrampoline(callReflectPtr, callDump, callReflectTrampolineHolder)
+		var tmp func(ctxt unsafe.Pointer, frame unsafe.Pointer, retValid *bool, regs unsafe.Pointer)
+		_, err := unexports2.CreateFuncForCodePtr(&tmp, reflect.ValueOf(callDump).Pointer())
+		if err != nil {
+			panic(err)
+		}
+		callDumpFuncVal = tmp
+
+		guard, err := patch.PtrTrampoline(callReflectPtr, callDumpFuncVal, callReflectTrampolineHolder)
 		if err != nil {
 			panic(err)
 		}
 
 		// Make origCallReflect callable by wiring a function value to the fixed origin.
-		var tmp func(ctxt unsafe.Pointer, frame unsafe.Pointer, retValid *bool, regs unsafe.Pointer)
 		_, err = unexports2.CreateFuncForCodePtr(&tmp, guard.FixOriginFunc())
 		if err != nil {
 			panic(err)
@@ -291,6 +300,7 @@ func dumpArgsAndZeroRets(impl *dumpFuncImpl, frame unsafe.Pointer, retValid *boo
 	opt.MaxDepth = 3
 
 	// Dump inputs.
+	var keepAlive []any
 	if DumpEnabled {
 		for i := 0; i < impl.fnType.NumIn(); i++ {
 			at := impl.fnType.In(i)
@@ -299,7 +309,10 @@ func dumpArgsAndZeroRets(impl *dumpFuncImpl, frame unsafe.Pointer, retValid *boo
 				continue
 			}
 
-			addr := impl.abid.addrOfArg(i, at, frame, regs)
+			addr, ka := impl.abid.addrOfArg(i, at, frame, regs)
+			if ka != nil {
+				keepAlive = append(keepAlive, ka)
+			}
 			if addr == nil {
 				fmt.Printf("arg%d=%s\n", i, `"<unavailable>"`)
 				continue
@@ -390,6 +403,9 @@ func dumpArgsAndZeroRets(impl *dumpFuncImpl, frame unsafe.Pointer, retValid *boo
 		if retValid != nil && impl.stackArgsSz > impl.stackRetOff {
 			*retValid = true
 		}
+		// Make sure any temporary values materialized from register args/returns remain alive
+		// for the duration of JSON encoding. (Their addresses are held only in unsafe pointers.)
+		runtime.KeepAlive(keepAlive)
 		return
 	}
 
@@ -398,16 +414,21 @@ func dumpArgsAndZeroRets(impl *dumpFuncImpl, frame unsafe.Pointer, retValid *boo
 	if retValid != nil && impl.abid.stackCallArgsSize > uintptr(impl.abid.retOffset) {
 		*retValid = true
 	}
+	runtime.KeepAlive(keepAlive)
 }
 
 func dumpReturns(impl *dumpFuncImpl, frame unsafe.Pointer, regs *regArgs, opt abijson.Options) {
+	var keepAlive []any
 	for i := 0; i < impl.fnType.NumOut(); i++ {
 		rt := impl.fnType.Out(i)
 		if rt.Size() == 0 {
 			fmt.Printf("ret%d=%s\n", i, "null")
 			continue
 		}
-		addr := impl.abid.addrOfRet(i, rt, frame, regs)
+		addr, ka := impl.abid.addrOfRet(i, rt, frame, regs)
+		if ka != nil {
+			keepAlive = append(keepAlive, ka)
+		}
 		if addr == nil {
 			fmt.Printf("ret%d=%s\n", i, `"<unavailable>"`)
 			continue
@@ -419,9 +440,10 @@ func dumpReturns(impl *dumpFuncImpl, frame unsafe.Pointer, regs *regArgs, opt ab
 		}
 		fmt.Printf("ret%d=%s\n", i, string(b))
 	}
+	runtime.KeepAlive(keepAlive)
 }
 
-func dumpPanic(v any, _ abijson.Options) {
+func dumpPanic(v interface{}, _ abijson.Options) {
 	// Do NOT attempt to pass &v to abijson with reflect.TypeOf(v):
 	// &v points to an interface header, not the concrete value storage.
 	//
@@ -462,9 +484,9 @@ type eface struct {
 	data unsafe.Pointer
 }
 
-func packEface(typ, data unsafe.Pointer) any {
+func packEface(typ, data unsafe.Pointer) interface{} {
 	e := eface{typ: typ, data: data}
-	return *(*any)(unsafe.Pointer(&e))
+	return *(*interface{})(unsafe.Pointer(&e))
 }
 
 // --- ABI layout (reflect/abi.go-derived; uses reflect.Type, not reflect.Value) ---
@@ -528,7 +550,7 @@ func (a *abiSeq) addArg(t reflect.Type) *abiStep {
 
 func (a *abiSeq) regAssign(t reflect.Type, offset uintptr) bool {
 	switch t.Kind() {
-	case reflect.UnsafePointer, reflect.Pointer, reflect.Chan, reflect.Map, reflect.Func:
+	case reflect.UnsafePointer, kindPointer, reflect.Chan, reflect.Map, reflect.Func:
 		return a.assignIntN(offset, t.Size(), 1, 0b1)
 	case reflect.Bool, reflect.Int, reflect.Uint, reflect.Int8, reflect.Uint8, reflect.Int16, reflect.Uint16,
 		reflect.Int32, reflect.Uint32, reflect.Uintptr:
@@ -709,25 +731,44 @@ func (a abiDesc) frameTypeSizeBytes() uintptr {
 	return align(a.retOffset+a.ret.stackBytes, ptrSize)
 }
 
-func (a abiDesc) addrOfArg(i int, t reflect.Type, frame unsafe.Pointer, regs *regArgs) unsafe.Pointer {
+func (a abiDesc) addrOfArg(i int, t reflect.Type, frame unsafe.Pointer, regs *regArgs) (unsafe.Pointer, any) {
 	steps := a.call.stepsForValue(i)
 	if len(steps) == 0 {
-		return nil
+		return nil, nil
 	}
 	if steps[0].kind == abiStepStack {
-		return unsafe.Add(frame, steps[0].stkOff)
+		addr := unsafe.Add(frame, steps[0].stkOff)
+		if DebugEnabled && i == 0 && t.Kind() == reflect.String {
+			sh := (*reflect.StringHeader)(addr)
+			_, _ = fmt.Fprintf(os.Stderr, "[argdump][debug] arg0 string from STACK off=%d data=0x%x len=%d\n", steps[0].stkOff, sh.Data, sh.Len)
+		}
+		return addr, nil
 	}
 
-	// Re-materialize register-passed args into a temporary buffer so we have an address.
+	// Register-passed args need an addressable backing store for EncodeJSONFromAddr.
+	//
+	// IMPORTANT: We must keep the backing store alive using a normal Go reference.
+	// Returning only an unsafe.Pointer is not enough: JSON encoding may allocate and
+	// trigger GC, which can reclaim the temp object if it isn't otherwise referenced.
 	if t.Size() == 0 {
-		return nil
+		return nil, nil
 	}
-	buf := make([]byte, t.Size())
-	dst := unsafe.Pointer(unsafe.SliceData(buf))
+	box := reflect.New(t) // *T
+	dst := unsafe.Pointer(box.Pointer())
+	if DebugEnabled && i == 0 && t.Kind() == reflect.String {
+		_, _ = fmt.Fprintf(os.Stderr, "[argdump][debug] arg0 string from REGS steps=%v ints0=0x%x ints1=0x%x ptr0=%p ptr1=%p\n",
+			steps, regs.Ints[0], regs.Ints[1], regs.Ptrs[0], regs.Ptrs[1],
+		)
+	}
 	for _, st := range steps {
 		switch st.kind {
-		case abiStepIntReg, abiStepPointer:
+		case abiStepIntReg:
 			memmove(unsafe.Add(dst, st.offset), regs.intRegArgAddr(st.ireg, st.size), st.size)
+		case abiStepPointer:
+			// For pointer-carrying regs, prefer RegArgs.Ptrs (GC-visible pointer-typed slots).
+			// This avoids depending on the untyped Ints view for pointers, which can be
+			// brittle across versions/toolchains.
+			memmove(unsafe.Add(dst, st.offset), unsafe.Pointer(&regs.Ptrs[st.ireg]), st.size)
 		case abiStepFloatReg:
 			switch st.size {
 			case 4:
@@ -742,28 +783,31 @@ func (a abiDesc) addrOfArg(i int, t reflect.Type, frame unsafe.Pointer, regs *re
 			panic("argdump: unknown step kind")
 		}
 	}
-	return dst
+	return dst, box.Interface()
 }
 
-func (a abiDesc) addrOfRet(i int, t reflect.Type, frame unsafe.Pointer, regs *regArgs) unsafe.Pointer {
+func (a abiDesc) addrOfRet(i int, t reflect.Type, frame unsafe.Pointer, regs *regArgs) (unsafe.Pointer, any) {
 	steps := a.ret.stepsForValue(i)
 	if len(steps) == 0 {
-		return nil
+		return nil, nil
 	}
 	if steps[0].kind == abiStepStack {
-		return unsafe.Add(frame, steps[0].stkOff)
+		return unsafe.Add(frame, steps[0].stkOff), nil
 	}
 
-	// Re-materialize register-returned values into a temporary buffer so we have an address.
+	// Register-returned values need an addressable backing store for EncodeJSONFromAddr.
+	// See addrOfArg for the GC/keepalive rationale.
 	if t.Size() == 0 {
-		return nil
+		return nil, nil
 	}
-	buf := make([]byte, t.Size())
-	dst := unsafe.Pointer(unsafe.SliceData(buf))
+	box := reflect.New(t) // *T
+	dst := unsafe.Pointer(box.Pointer())
 	for _, st := range steps {
 		switch st.kind {
-		case abiStepIntReg, abiStepPointer:
+		case abiStepIntReg:
 			memmove(unsafe.Add(dst, st.offset), regs.intRegArgAddr(st.ireg, st.size), st.size)
+		case abiStepPointer:
+			memmove(unsafe.Add(dst, st.offset), unsafe.Pointer(&regs.Ptrs[st.ireg]), st.size)
 		case abiStepFloatReg:
 			switch st.size {
 			case 4:
@@ -778,7 +822,7 @@ func (a abiDesc) addrOfRet(i int, t reflect.Type, frame unsafe.Pointer, regs *re
 			panic("argdump: unknown step kind")
 		}
 	}
-	return dst
+	return dst, box.Interface()
 }
 
 func (a abiDesc) zeroRets(fnType reflect.Type, frame unsafe.Pointer, regs *regArgs) {
@@ -808,7 +852,7 @@ func addTypeBits(bv *bitVector, offset uintptr, t reflect.Type) {
 		return
 	}
 	switch t.Kind() {
-	case reflect.Chan, reflect.Func, reflect.Map, reflect.Pointer, reflect.Slice, reflect.String, reflect.UnsafePointer:
+	case reflect.Chan, reflect.Func, reflect.Map, kindPointer, reflect.Slice, reflect.String, reflect.UnsafePointer:
 		for bv.n < uint32(offset/ptrSize) {
 			bv.append(0)
 		}
@@ -833,7 +877,7 @@ func addTypeBits(bv *bitVector, offset uintptr, t reflect.Type) {
 
 func typeHasPointers(t reflect.Type) bool {
 	switch t.Kind() {
-	case reflect.Chan, reflect.Func, reflect.Map, reflect.Pointer, reflect.Slice, reflect.String,
+	case reflect.Chan, reflect.Func, reflect.Map, kindPointer, reflect.Slice, reflect.String,
 		reflect.Interface, reflect.UnsafePointer:
 		return true
 	case reflect.Array:

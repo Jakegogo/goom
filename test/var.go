@@ -10,6 +10,18 @@ var (
 	unexportedGlobalStructPointerVar = &Struct{Field1: "p1"}
 )
 
+// Keep references to unexported globals so the compiler/linker don't inline them away
+// and the symbol table lookup (used by unexports-based mockers) can find them.
+// Without this, some go versions can optimize getters to return constants and drop the var symbols.
+var (
+	keepUnexportedGlobalIntVar           = &unexportedGlobalIntVar
+	keepUnexportedGlobalStrVar           = &unexportedGlobalStrVar
+	keepUnexportedGlobalMapVar           = &unexportedGlobalMapVar
+	keepUnexportedGlobalArrVar           = &unexportedGlobalArrVar
+	keepUnexportedGlobalStructVar        = &unexportedGlobalStructVar
+	keepUnexportedGlobalStructPointerVar = &unexportedGlobalStructPointerVar
+)
+
 // UnexportedGlobalIntVar 获取未导出Int全局变量
 func UnexportedGlobalIntVar() int {
 	return unexportedGlobalIntVar

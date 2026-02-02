@@ -3,6 +3,8 @@ package patch
 
 import (
 	"errors"
+	"fmt"
+	"os"
 	"reflect"
 	"runtime"
 	"sync"
@@ -71,6 +73,7 @@ func (p *patch) unsafePatchValue() error {
 		return errors.New("replacementValue has to be a ExportFunc")
 	}
 	originPointer := p.originValue.Pointer()
+	tracePatchOrigin("origin", originPointer, p.originValue.Type().String())
 	p.originPtr = originPointer
 
 	// fix for generics variants
@@ -82,6 +85,18 @@ func (p *patch) unsafePatchValue() error {
 		}
 	}
 	return p.unsafePatchPtr()
+}
+
+func tracePatchOrigin(label string, addr uintptr, typeName string) {
+	if os.Getenv("GOOM_TRACE_MPROTECT") != "1" {
+		return
+	}
+	fn := runtime.FuncForPC(addr)
+	name := "<unknown>"
+	if fn != nil {
+		name = fn.Name()
+	}
+	_, _ = fmt.Fprintf(os.Stderr, "[mprotect] hookOrigin %s addr=0x%x func=%s type=%s\n", label, addr, name, typeName)
 }
 
 // unsafePatchPtr 不做类型检查
@@ -165,6 +180,7 @@ func registerPatchLocked(originPtr uintptr, jumpBytes []byte, fixOriginPtr uintp
 		unpatchValue(originPtr)
 	}
 
+	tracePatchOrigin("register", originPtr, "<unknown>")
 	originBytes, err := checkAndReadOriginBytes(originPtr, len(jumpBytes))
 	if err != nil {
 		return nil, err

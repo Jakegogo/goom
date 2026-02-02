@@ -58,9 +58,9 @@ func fixBlockArm64(from uintptr, block []byte, trampoline uintptr,
 		}
 
 		for _, w := range outWords {
-		out := make([]byte, 4)
+			out := make([]byte, 4)
 			binary.LittleEndian.PutUint32(out, w)
-		fixedBlock = append(fixedBlock, out...)
+			fixedBlock = append(fixedBlock, out...)
 			outPos += arm64InsnLen
 		}
 
@@ -299,6 +299,23 @@ func loadAddrToX16(addr uintptr) []uint32 {
 		movImmToReg(16, arm64MOVK, 1, d2d3),
 		movImmToReg(16, arm64MOVK, 2, d4d5),
 		movImmToReg(16, arm64MOVK, 3, d6d7),
+	}
+}
+
+func loadAddrToX26(addr uintptr) []uint32 {
+	// Key stability note (darwin/arm64 + regabi):
+	// x26 is the funcval/closure context register used by Go's arm64 ABI for func values.
+	// Some patched entry stubs must set x26 to the funcval address before branching so
+	// wrappers like reflect.makeFuncStub can read their ctxt correctly.
+	d0d1 := addr & 0xFFFF
+	d2d3 := (addr >> 16) & 0xFFFF
+	d4d5 := (addr >> 32) & 0xFFFF
+	d6d7 := (addr >> 48) & 0xFFFF
+	return []uint32{
+		movImmToReg(26, arm64MOVZ, 0, d0d1),
+		movImmToReg(26, arm64MOVK, 1, d2d3),
+		movImmToReg(26, arm64MOVK, 2, d4d5),
+		movImmToReg(26, arm64MOVK, 3, d6d7),
 	}
 }
 

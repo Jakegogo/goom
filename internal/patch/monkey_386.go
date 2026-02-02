@@ -4,7 +4,7 @@ package patch
 const nopOpcode = 0x90
 
 // jmpToFunctionValue Assembles a jump to a function value
-func jmpToFunctionValue(_, to uintptr) []byte {
+func jmpToFunctionValue(_, to uintptr, _ uintptr) []byte {
 	return []byte{
 		0xBA,
 		byte(to),

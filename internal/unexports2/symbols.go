@@ -3,6 +3,7 @@ package unexports2
 import (
 	"debug/gosym"
 	"fmt"
+	"strings"
 )
 
 var (
@@ -80,10 +81,16 @@ func getVarSymbolByName(name string) (symbol *gosym.Sym, err error) {
 // LookupSym returns the text, data, or bss symbol with the given name,
 // or nil if no such symbol is found.
 func lookupSym(t *gosym.Table, name string) *gosym.Sym {
+	// Stability note (darwin/arm64):
+	// Mach-O symbol tables may include a leading '_' for data symbols depending on how the binary is produced.
+	// The higher-level APIs (users) refer to Go symbol names without this underscore.
+	//
+	// If we require an exact match only, FindVarByName can fail spuriously and callers end up
+	// constructing invalid pointers or panicking during unexported-var mocking.
 	// TODO(austin) Maybe make a map
 	for i := range t.Syms {
 		s := &t.Syms[i]
-		if s.Name == name {
+		if s.Name == name || s.Name == "_"+name || strings.TrimPrefix(s.Name, "_") == name {
 			return s
 		}
 	}

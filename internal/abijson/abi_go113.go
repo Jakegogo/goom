@@ -1,10 +1,11 @@
-//go:build go1.24 && arm64
+//go:build go1.13
+// +build go1.13
 
 package abijson
 
 import "unsafe"
 
-// Minimal copies of Go 1.24 internal/abi structs/constants.
+// Minimal copies of runtime type structs/constants (stable enough for go1.13+).
 // These are copied to avoid importing stdlib internal packages and to avoid //go:linkname.
 
 type abiKind uint8
@@ -46,18 +47,11 @@ const (
 
 type abiTFlag uint8
 
-const (
-	abiTFlagUncommon       abiTFlag = 1 << 0
-	abiTFlagExtraStar      abiTFlag = 1 << 1
-	abiTFlagNamed          abiTFlag = 1 << 2
-	abiTFlagRegularMemory  abiTFlag = 1 << 3
-	abiTFlagGCMaskOnDemand abiTFlag = 1 << 4
-)
-
 type abiNameOff int32
 type abiTypeOff int32
 
-// abiType matches go1.24 internal/abi.Type (prefix).
+// abiType matches the runtime type prefix used by reflect.Type's concrete representation.
+// (In newer toolchains this aligns with internal/abi.Type.)
 type abiType struct {
 	Size_       uintptr
 	PtrBytes    uintptr
@@ -76,7 +70,8 @@ func (t *abiType) kind() abiKind    { return t.Kind_ & abiKindMask }
 func (t *abiType) pointers() bool   { return t.PtrBytes != 0 }
 func (t *abiType) ifaceIndir() bool { return t.Kind_&abiKindDirectIface == 0 }
 
-// oldMapType matches go1.24 internal/abi.OldMapType.
+// oldMapType matches the runtime noswiss map type used by the compiler/runtime.
+// Layout is treated as a best-effort POC and may drift across toolchains.
 type oldMapType struct {
 	abiType
 	Key        *abiType
@@ -95,32 +90,4 @@ func (mt *oldMapType) indirectElem() bool { return mt.Flags&2 != 0 }
 const (
 	oldMapBucketCountBits = 3
 	oldMapBucketCount     = 1 << oldMapBucketCountBits
-)
-
-// swissMapType matches go1.24 internal/abi.SwissMapType.
-type swissMapType struct {
-	abiType
-	Key       *abiType
-	Elem      *abiType
-	Group     *abiType
-	Hasher    func(unsafe.Pointer, uintptr) uintptr
-	GroupSize uintptr
-	SlotSize  uintptr
-	ElemOff   uintptr
-	Flags     uint32
-}
-
-const (
-	swissMapNeedKeyUpdate uint32 = 1 << iota
-	swissMapHashMightPanic
-	swissMapIndirectKey
-	swissMapIndirectElem
-)
-
-func (mt *swissMapType) indirectKey() bool  { return mt.Flags&swissMapIndirectKey != 0 }
-func (mt *swissMapType) indirectElem() bool { return mt.Flags&swissMapIndirectElem != 0 }
-
-const (
-	swissMapGroupSlotsBits = 3
-	swissMapGroupSlots     = 1 << swissMapGroupSlotsBits // 8
 )

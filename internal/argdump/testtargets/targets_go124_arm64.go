@@ -1,4 +1,5 @@
 //go:build go1.24 && arm64
+// +build go1.24,arm64
 
 package testtargets
 

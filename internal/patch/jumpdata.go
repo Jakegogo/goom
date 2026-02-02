@@ -50,7 +50,7 @@ func genJumpData(origin, replacementInAddr, replacementCode uintptr) (jumpData [
 	}
 
 	// 构造跳转到代理函数的指令
-	jumpData = jmpToFunctionValue(origin, replacementInAddr)
+	jumpData = jmpToFunctionValue(origin, replacementInAddr, replacementCode)
 	// 如果需要织入的跳转指令的长度大于原函数指令长度,则任务是无法织入指令
 	if len(jumpData) >= funcSize {
 		bytecode.PrintInst("origin inst > ", origin, bytecode.PrintShort, logger.InfoLevel)

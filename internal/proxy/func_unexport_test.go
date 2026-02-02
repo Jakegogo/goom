@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"os"
-	"strconv"
 	"testing"
 	"time"
 
@@ -29,16 +27,39 @@ func TestNetConnMock(t *testing.T) {
 		t.Error("mock print err:", err)
 	}
 
-	// 发起网络请求
-	host := "127.0.0.1"
-	port := 80
-
-	conn, err := net.Dial("tcp", host+":"+strconv.Itoa(port))
-	fmt.Println("Connecting to " + host + ":" + strconv.Itoa(port))
-
+	// Stability note:
+	// This test used to hardcode 127.0.0.1:80 and os.Exit(1) on failure, which is flaky in CI
+	// and can terminate the whole test run. We instead use an ephemeral local listener.
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
-		fmt.Println("Error connecting:", err)
-		os.Exit(1)
+		t.Fatalf("listen: %v", err)
+	}
+	defer ln.Close()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		c, aerr := ln.Accept()
+		if aerr != nil {
+			return
+		}
+		// Stability note:
+		// Don't block forever waiting for EOF. If the patch fails to intercept net.(*conn).Write
+		// on a given Go version/OS build, the client may not send anything and the server goroutine
+		// would hang, causing a 10-minute test timeout.
+		_ = c.SetReadDeadline(time.Now().Add(2 * time.Second))
+		buf := make([]byte, 64)
+		_, _ = c.Read(buf)
+		_ = c.Close()
+	}()
+
+	addr := ln.Addr().String()
+	conn, err := net.Dial("tcp", addr)
+	fmt.Println("Connecting to " + addr)
+	if err != nil {
+		// Don't crash the whole test process.
+		t.Skipf("dial failed: %v", err)
+		return
 	}
 	defer conn.Close()
 
@@ -48,6 +69,8 @@ func TestNetConnMock(t *testing.T) {
 	// 预期返回: err: mocked
 	t.Log("err:", err)
 	patch.Unpatch()
+	_ = conn.Close()
+	<-done
 }
 
 // // nolint

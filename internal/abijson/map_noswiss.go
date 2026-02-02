@@ -1,4 +1,5 @@
-//go:build go1.24 && arm64 && !goexperiment.swissmap
+//go:build go1.13 && !goexperiment.swissmap
+// +build go1.13,!goexperiment.swissmap
 
 package abijson
 
@@ -7,18 +8,23 @@ import (
 	"unsafe"
 )
 
-// This file is a minimal, best-effort map iterator for Go 1.24 noswiss map layout.
-// It is adapted from Go 1.24 runtime/map_noswiss.go, but trimmed down and without //go:linkname.
+// This file is a minimal, best-effort map iterator for the legacy (noswiss) map layout.
+// It is adapted from the Go runtime, but trimmed down and without //go:linkname.
+//
+// POC constraints:
+// - assumes no concurrent map writes
+// - refuses to iterate maps in the middle of growth (oldbuckets != nil)
 
 const (
-	emptyRest  = 0
 	emptyOne   = 1
 	minTopHash = 5
 )
 
 func isEmptyTopHash(x uint8) bool { return x <= emptyOne }
 
-// hmap matches Go 1.24 runtime.hmap layout for !swissmap.
+// hmap matches the runtime.hmap *prefix* needed by this iterator.
+// We intentionally keep this as a prefix struct so it is more tolerant to
+// runtime layout drift across toolchain versions.
 type hmap struct {
 	count     int
 	flags     uint8
@@ -29,9 +35,6 @@ type hmap struct {
 	buckets    unsafe.Pointer
 	oldbuckets unsafe.Pointer
 	nevacuate  uintptr
-	clearSeq   uint64
-
-	extra unsafe.Pointer // *mapextra (not used in this POC)
 }
 
 // bmap is bucket header (tophash only; data follows).
@@ -45,9 +48,9 @@ var dataOffset = unsafe.Offsetof(struct {
 	v int64
 }{}.v)
 
-func add(p unsafe.Pointer, x uintptr) unsafe.Pointer { return unsafe.Add(p, x) }
-
 func bucketShift(b uint8) uintptr { return uintptr(1) << (b & 63) }
+
+func add(p unsafe.Pointer, x uintptr) unsafe.Pointer { return unsafe.Pointer(uintptr(p) + x) }
 
 func (b *bmap) overflow(t *oldMapType) *bmap {
 	// overflow pointer is at end of bucket.
@@ -99,7 +102,7 @@ func (it *mapIter) next() (unsafe.Pointer, unsafe.Pointer, bool) {
 			i := it.off
 			it.off++
 			th := it.b.tophash[i]
-			if isEmptyTopHash(th) {
+			if isEmptyTopHash(th) || th < minTopHash {
 				continue
 			}
 

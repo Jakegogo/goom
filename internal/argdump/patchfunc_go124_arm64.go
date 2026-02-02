@@ -1,4 +1,5 @@
-//go:build go1.24 && arm64
+//go:build go1.24
+// +build go1.24
 
 package argdump
 
@@ -46,7 +47,7 @@ var guardKeepAlive sync.Map // map[*patch.Guard]any
 //
 // Note: this relies on patching the function entry point, so it is inherently unsafe
 // and should only be used in controlled environments (tests / debugging).
-func PatchFunc(fn any) (*patch.Guard, error) {
+func PatchFunc(fn interface{}) (*patch.Guard, error) {
 	if fn == nil {
 		return nil, errors.New("argdump: PatchFunc nil")
 	}
@@ -106,7 +107,8 @@ func PatchFuncPtr(originPtr uintptr, origFuncVal unsafe.Pointer, typ reflect.Typ
 		)
 	}
 
-	// Patch origin entry to call reflect.makeFuncStub, with x26 pointing at our makeFuncCtxt
+	// Patch origin entry to call reflect.makeFuncStub, with the architecture's context register
+	// pointing at our makeFuncCtxt
 	// (dumpFuncImpl embeds it at the start). The call stub preserves the caller's x26.
 	ctxtPtr := uintptr(unsafe.Pointer(impl))
 	// Debug aid: exported for tests/diagnostics.

@@ -3,8 +3,6 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
-        "mwrite_left_amd64.s",
-        "mwrite_left_arm64.s",
         "memory.go",
         "mwrite_amd64.go",
         "mwrite_arm64.go",
@@ -13,6 +11,10 @@ go_library(
         "mwrite_windows.go",
         "mwrite_right_amd64.s",
         "mwrite_right_arm64.s",
+        "write_darwin.go",
+        "write_linux.go",
+        "write_linux_amd64.s",
+        "write_linux_arm64.s",
         "icache_arm64.go",
         "icache_arm64_17.go",
         "icache_arm64_18.go",

@@ -108,7 +108,15 @@ func buildFixOriginTrampoline(origin uintptr, jumpInstSize int) (uintptr, error)
 	//
 	// If the placeholder space is exhausted, callers should fall back to Unpatch/Restore
 	// rather than executing a metadata-free trampoline.
-	space, err := stub.AcquireFromHolder(2048)
+	// Trampoline code is typically small (copied prologue + one jump-back sequence).
+	// Keeping this allocation tight reduces placeholder pressure when many patches are installed.
+	//
+	// NOTE: we still force the placeholder region for runtime metadata (see comment above).
+	need := 512
+	if jumpInstSize > need {
+		need = jumpInstSize
+	}
+	space, err := stub.AcquireFromHolder(need)
 	if err != nil {
 		return 0, err
 	}

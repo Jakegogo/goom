@@ -60,11 +60,11 @@ func AcquireFromHolder(spaceLen int) (*Space, error) {
 func Write(s *Space, data []byte) error {
 	switch s.typ {
 	case TypeMMap:
-		copy(*s.Space, data[:])
-		return nil
+		return writeToMMap(s.Addr, s.Space, data)
 	case TypeHolder:
 		return memory.WriteTo(s.Addr, data)
 	default:
 		return fmt.Errorf("stub write fail, illegal type: %d", s.typ)
 	}
 }
+

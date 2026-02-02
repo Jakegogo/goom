@@ -1,16 +1,26 @@
-//go:build go1.24 && arm64 && !goexperiment.swissmap
+//go:build go1.13
+// +build go1.13
 
 package abijson
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 	"unsafe"
 )
 
+type testS struct {
+	A int            `json:"a"`
+	B string         `json:"b"`
+	M map[string]int `json:"m"`
+	X interface{}    `json:"x"`
+	P *int           `json:"p"`
+}
+
 func TestEncodeJSONFromAddr_Basic(t *testing.T) {
 	i := 123
-	v := S{
+	v := testS{
 		A: 7,
 		B: "ok",
 		M: map[string]int{"k": 1, "z": 2},
@@ -25,4 +35,5 @@ func TestEncodeJSONFromAddr_Basic(t *testing.T) {
 	if len(b) == 0 {
 		t.Fatalf("empty json")
 	}
+	fmt.Println(string(b))
 }

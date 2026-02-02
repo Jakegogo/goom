@@ -3,6 +3,8 @@ package patch
 
 import (
 	"fmt"
+	"os"
+	"runtime"
 
 	"github.com/tencent/goom/internal/bytecode"
 	"github.com/tencent/goom/internal/bytecode/memory"
@@ -25,6 +27,7 @@ func (g *Guard) Apply() {
 
 	g.applied = true
 	// 执行函数调用地址替换(延迟执行)
+	traceHookTarget("apply", g.origin)
 	if err := memory.WriteTo(g.origin, g.jumpBytes); err != nil {
 		logger.Errorf("Apply to 0x%x error: %s", g.origin, err)
 	}
@@ -35,6 +38,7 @@ func (g *Guard) Apply() {
 // 外部调用请使用 PatchGuard.UnpatchWithLock()
 func (g *Guard) Unpatch() {
 	if g != nil && g.applied {
+		traceHookTarget("unpatch", g.origin)
 		if err := memory.WriteTo(g.origin, g.originBytes); err != nil {
 			logger.Errorf("Unpatch to 0x%x error: %s", g.origin, err)
 		}
@@ -54,6 +58,7 @@ func (g *Guard) Restore() {
 	lock()
 	defer unlock()
 	if g != nil && g.applied {
+		traceHookTarget("restore", g.origin)
 		if err := memory.WriteTo(g.origin, g.jumpBytes); err != nil {
 			logger.Errorf("Restore to 0x%x error: %s", g.origin, err)
 		}
@@ -69,4 +74,16 @@ func (g *Guard) FixOriginFunc() uintptr {
 // OriginFunc returns the address that this guard patched (the function entry).
 func (g *Guard) OriginFunc() uintptr {
 	return g.origin
+}
+
+func traceHookTarget(action string, addr uintptr) {
+	if os.Getenv("GOOM_TRACE_MPROTECT") != "1" {
+		return
+	}
+	fn := runtime.FuncForPC(addr)
+	name := "<unknown>"
+	if fn != nil {
+		name = fn.Name()
+	}
+	_, _ = fmt.Fprintf(os.Stderr, "[mprotect] hookTarget action=%s addr=0x%x func=%s\n", action, addr, name)
 }

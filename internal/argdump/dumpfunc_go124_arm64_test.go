@@ -1,9 +1,11 @@
-//go:build go1.24 && arm64
+//go:build go1.18 && arm64
+// +build go1.18,arm64
 
 package argdump_test
 
 import (
 	"bytes"
+	"encoding/hex"
 	"io"
 	"os"
 	"reflect"
@@ -11,6 +13,8 @@ import (
 	"testing"
 
 	"github.com/tencent/goom/internal/argdump"
+	"github.com/tencent/goom/internal/bytecode/memory"
+	"github.com/tencent/goom/internal/unexports2"
 )
 
 func TestMakeDumpFunc_PrintsArgsAndReturnsZero(t *testing.T) {
@@ -21,6 +25,21 @@ func TestMakeDumpFunc_PrintsArgsAndReturnsZero(t *testing.T) {
 	f, ok := fAny.(Fn)
 	if !ok {
 		t.Fatalf("type assertion failed: got %T", fAny)
+	}
+
+	if os.Getenv("ARGDUMP_DEBUG") == "1" {
+		callReflect, _ := unexports2.FindFuncByName("reflect.callReflect")
+		callReflectAbi0, _ := unexports2.FindFuncByName("reflect.callReflect.abi0")
+		t.Logf("DebugCallReflectPtr=0x%x callReflect=0x%x callReflect.abi0=0x%x", argdump.DebugCallReflectPtr, callReflect, callReflectAbi0)
+		if argdump.DebugCallReflectPtr != 0 {
+			t.Logf("patchedTargetBytes=%s", hex.EncodeToString(memory.RawRead(argdump.DebugCallReflectPtr, 16)))
+		}
+		if callReflect != 0 {
+			t.Logf("sym.callReflect.bytes=%s", hex.EncodeToString(memory.RawRead(callReflect, 16)))
+		}
+		if callReflectAbi0 != 0 {
+			t.Logf("sym.callReflect.abi0.bytes=%s", hex.EncodeToString(memory.RawRead(callReflectAbi0, 16)))
+		}
 	}
 
 	// Capture stdout.
@@ -54,4 +73,9 @@ func TestMakeDumpFunc_PrintsArgsAndReturnsZero(t *testing.T) {
 	if !strings.Contains(out, "arg0=") || !strings.Contains(out, "arg1=") || !strings.Contains(out, "arg2=") || !strings.Contains(out, "arg3=") {
 		t.Fatalf("unexpected stdout:\n%s", out)
 	}
+}
+
+// Keep Makefile / compatibility tests working: they run -run=^TestUnit.
+func TestUnitMakeDumpFunc_PrintsArgsAndReturnsZero(t *testing.T) {
+	TestMakeDumpFunc_PrintsArgsAndReturnsZero(t)
 }

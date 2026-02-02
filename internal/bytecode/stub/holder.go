@@ -45,7 +45,6 @@ func init() {
 		logger.Error("GetFuncSize error", err)
 		size = 102400
 	}
-
 	placeHolderIns = &PlaceHolder{
 		count: 0,
 		off:   offset,

@@ -16,7 +16,10 @@ func acquireFromMMap(len int) (uintptr, *[]byte, error) {
 		-1,
 		0,
 		len,
-		syscall.PROT_READ|syscall.PROT_WRITE|syscall.PROT_EXEC,
+		// W^X note (darwin/arm64):
+		// RWX mappings can fail under macOS hardened runtime / JIT restrictions.
+		// Allocate RW here, then switch to RX after writing the final code bytes.
+		syscall.PROT_READ|syscall.PROT_WRITE,
 		syscall.MAP_SHARED|syscall.MAP_ANON)
 	if err != nil {
 		logger.Debugf("acquireFromMMap fail: %v\n", err)

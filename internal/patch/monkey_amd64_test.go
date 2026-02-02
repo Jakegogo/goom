@@ -9,7 +9,7 @@ func TestJmpToFunctionValue_ShortJump_RIPRelativeIndirect(t *testing.T) {
 	from := uintptr(0x100000000)
 	to := from + 0x200 // within int32 RIP-relative range
 
-	out := jmpToFunctionValue(from, to)
+	out := jmpToFunctionValue(from, to, 0)
 	if len(out) != 7 {
 		t.Fatalf("unexpected len=%d, want 7, out=%x", len(out), out)
 	}
@@ -32,7 +32,7 @@ func TestJmpToFunctionValue_Fallback_LongForm(t *testing.T) {
 	from := uintptr(0x1000)
 	to := uintptr(0x7fff_ffff_ffff_ffff) // force out-of-range for disp32
 
-	out := jmpToFunctionValue(from, to)
+	out := jmpToFunctionValue(from, to, 0)
 	if len(out) != 13 {
 		t.Fatalf("unexpected len=%d, want 13, out=%x", len(out), out)
 	}

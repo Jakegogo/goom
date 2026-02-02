@@ -1,4 +1,7 @@
-//go:build go1.24 && arm64 && goexperiment.swissmap
+//go:build go1.24 && goexperiment.swissmap && (amd64 || arm64 || 386)
+// +build go1.24
+// +build goexperiment.swissmap
+// +build amd64 arm64 386
 
 package abijson
 
@@ -9,7 +12,7 @@ import (
 	"unsafe"
 )
 
-// Minimal swissmap iterator forked from go1.24 internal/runtime/maps layouts.
+// Minimal swissmap iterator forked from go1.24 runtime swissmap layouts.
 // This is a POC: it assumes no concurrent map writes and does not attempt to
 // preserve spec iteration semantics under mutation/grow.
 
@@ -35,7 +38,7 @@ type swissTable struct {
 	capacity   uint16
 	growthLeft uint16
 	localDepth uint8
-	_          uint8 // padding so index is 8-aligned on arm64
+	_          uint8 // padding so index is 8-aligned on ptr64
 	index      int
 	groups     swissGroups
 }
@@ -67,7 +70,7 @@ func (gs *swissGroups) group(mt *swissMapType, i uint64) swissGroupRef {
 }
 
 func (cg *swissCtrlGroup) get(i uintptr) uint8 {
-	// arm64 darwin is little-endian
+	// ptr64 platforms supported here are little-endian
 	return *(*uint8)(unsafe.Add(unsafe.Pointer(cg), i))
 }
 
@@ -243,46 +246,3 @@ func (e *encoder) encodeMap(t reflect.Type, addr unsafe.Pointer, depth int) erro
 	e.buf.WriteByte('}')
 	return nil
 }
-
-func (e *encoder) encodeMapKeyToString(t reflect.Type, addr unsafe.Pointer, depth int) (string, error) {
-	// reuse the same helper as noswiss by delegating through JSON encoding for uncommon keys.
-	switch t.Kind() {
-	case reflect.String:
-		return *(*string)(addr), nil
-	case reflect.Int:
-		return strconvI64(int64(*(*int)(addr))), nil
-	case reflect.Int8:
-		return strconvI64(int64(*(*int8)(addr))), nil
-	case reflect.Int16:
-		return strconvI64(int64(*(*int16)(addr))), nil
-	case reflect.Int32:
-		return strconvI64(int64(*(*int32)(addr))), nil
-	case reflect.Int64:
-		return strconvI64(*(*int64)(addr)), nil
-	case reflect.Uint:
-		return strconvU64(uint64(*(*uint)(addr))), nil
-	case reflect.Uint8:
-		return strconvU64(uint64(*(*uint8)(addr))), nil
-	case reflect.Uint16:
-		return strconvU64(uint64(*(*uint16)(addr))), nil
-	case reflect.Uint32:
-		return strconvU64(uint64(*(*uint32)(addr))), nil
-	case reflect.Uint64:
-		return strconvU64(*(*uint64)(addr)), nil
-	case reflect.Bool:
-		if *(*bool)(addr) {
-			return "true", nil
-		}
-		return "false", nil
-	default:
-		b, err := EncodeJSONFromAddrWithOptions(t, addr, e.opt)
-		if err != nil {
-			return "", err
-		}
-		return string(b), nil
-	}
-}
-
-func strconvI64(v int64) string { return strconv.FormatInt(v, 10) }
-
-func strconvU64(v uint64) string { return strconv.FormatUint(v, 10) }

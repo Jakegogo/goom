@@ -6,6 +6,7 @@ import (
 
 	"github.com/tencent/goom/internal/bytecode"
 	"github.com/tencent/goom/internal/bytecode/memory"
+	"github.com/tencent/goom/internal/bytecode/stub"
 	"github.com/tencent/goom/internal/logger"
 )
 
@@ -88,4 +89,38 @@ func fixOriginFuncToTrampoline(origin uintptr, trampoline uintptr, jumpInstSize 
 		trampoline, bytecode.PrintMiddle, logger.DebugLevel)
 	logger.Debugf("copy to trampoline %x ", trampoline)
 	return trampoline, nil
+}
+
+// buildFixOriginTrampoline mirrors the arm64 version: allocate executable space from the
+// in-binary stub holder (so it has proper runtime metadata), then copy/relocate enough
+// origin bytes and append a jump back to origin+N.
+func buildFixOriginTrampoline(origin uintptr, jumpInstSize int) (uintptr, error) {
+	space, err := stub.AcquireFromHolder(2048)
+	if err != nil {
+		return 0, err
+	}
+
+	originFuncSize, err := bytecode.GetFuncSize(defaultArchMod, origin, false)
+	if err != nil {
+		logger.Warningf("buildFixOriginTrampoline GetFuncSize error: %v", err)
+		originFuncSize = defaultFuncSize
+	}
+
+	originData := memory.RawRead(origin, originFuncSize)
+	fixedData, fixedDataSize, err := fixRelativeAddr(origin, originData, space.Addr, originFuncSize, jumpInstSize)
+	if err != nil {
+		return 0, err
+	}
+
+	jumpBack := jmpToOriginFunctionValue(space.Addr+uintptr(len(fixedData)), origin+uintptr(fixedDataSize))
+	code := append(fixedData, jumpBack...)
+
+	if err := stub.Write(space, code); err != nil {
+		return 0, err
+	}
+	logger.Debugf("buildFixOriginTrampoline origin=0x%x tramp=0x%x copied=%d out=%d", origin, space.Addr, fixedDataSize, len(code))
+	if space.Addr == 0 {
+		return 0, fmt.Errorf("buildFixOriginTrampoline: got zero trampoline address")
+	}
+	return space.Addr, nil
 }

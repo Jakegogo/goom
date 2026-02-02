@@ -1,4 +1,5 @@
-//go:build go1.24 && arm64
+//go:build go1.13
+// +build go1.13
 
 package abijson
 
@@ -9,7 +10,6 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
-	"unicode/utf8"
 	"unsafe"
 )
 
@@ -131,7 +131,7 @@ func (e *encoder) encode(t reflect.Type, addr unsafe.Pointer, depth int) error {
 		return e.encodeArray(t, addr, depth)
 	case reflect.Struct:
 		return e.encodeStruct(t, addr, depth)
-	case reflect.Pointer:
+	case kindPointer:
 		return e.encodePointer(t, addr, depth)
 	case reflect.Interface:
 		return e.encodeInterface(t, addr, depth)
@@ -282,6 +282,3 @@ func (e *encoder) writeString(s string) {
 	b, _ := json.Marshal(s)
 	e.buf.Write(b)
 }
-
-// utf8IsValid reports whether s is valid UTF-8.
-func utf8IsValid(s string) bool { return utf8.ValidString(s) }

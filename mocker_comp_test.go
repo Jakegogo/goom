@@ -29,6 +29,12 @@ func TestCompatibility(t *testing.T) {
 	if os.Getenv(testEnv) == "true" {
 		return
 	}
+	if os.Getenv("GOOM_ENABLE_COMPAT_TEST") != "1" {
+		// Stability note:
+		// This test downloads and runs multiple Go toolchains. In constrained/CI environments it can
+		// be slow (10m timeouts) and may require network/toolchain caching. Keep it opt-in.
+		t.Skip("set GOOM_ENABLE_COMPAT_TEST=1 to run multi-toolchain compatibility tests")
+	}
 
 	os.Setenv(testEnv, "true")
 	for _, v := range versions {

@@ -15,41 +15,45 @@ const (
 // nopOpcode 空指令插入到原函数开头第一个字节, 用于判断原函数是否已经被Patch过
 var nopOpcode = []byte{0xD5, 0x03, 0x20, 0x1F}
 
-func jmpToFunctionValue(from, to uintptr) []byte {
-	// Prefer a short PC-relative literal load when possible:
-	//   LDR X10, [PC, #imm]  ; load *(to) (the code pointer inside the func value)
-	//   BR  X10
-	// LDR (literal) range: imm19<<2 => +/- 1MB.
-	if from%4 == 0 && to%4 == 0 {
-		delta := int64(to) - int64(from+4) // PC is the address of this instruction + 4
-		if delta%4 == 0 {
-			imm19 := delta >> 2
-			if imm19 >= -(1<<18) && imm19 < (1<<18) {
-				ins := uint32(0x58000000) | (uint32(imm19)&0x7FFFF)<<5 | 10 // LDR X10, #imm
-				out := make([]byte, 8)
-				binary.LittleEndian.PutUint32(out[0:4], ins)
-				copy(out[4:8], []byte{0x40, 0x01, 0x1F, 0xD6}) // BR x10
-				return out
-			}
-		}
-	}
-
-	// Long jump path must NOT clobber x26.
-	// x26 is callee-saved and is used by reflect.makeFuncStub as the context register.
-	// Clobbering it causes ctxt corruption and can crash in callDump/reflect.callReflect.
+func jmpToFunctionValue(from, to uintptr, replacementCode uintptr) []byte {
+	_ = from
+	// WHY (darwin arm64e / PAC):
+	// - On arm64e, funcval.fn may carry a PAC-signed pointer. A plain BR xN does NOT
+	//   authenticate it, so jumping via `LDR x16, [x26]; BR x16` can execute a
+	//   signature-polluted address and SIGBUS (observed on go1.17).
+	// - Using the code pointer (replacementCode) avoids PAC issues because it is
+	//   a direct, unsigned entry PC.
 	//
-	// Use x16/x17 (IP0/IP1) which are scratch registers:
-	//   MOVZ/MOVK x16, to
-	//   LDR x17, [x16]   ; load *(to) (the code pointer inside the func value)
-	//   BR  x17
-	res := make([]byte, 0, 24)
-	for _, w := range loadAddrToX16(to) {
+	// Affected scope:
+	// - go1.17+ on darwin/arm64e when patching via funcval-based trampolines.
+	// - Non-arm64e (linux arm64, darwin arm64 w/o PAC) is unaffected, but this path
+	//   remains safe and compatible across versions.
+	//
+	// Always use an absolute jump sequence that:
+	// - sets x26=funcval address (ctxt register)
+	// - branches to the replacement code pointer directly
+	//
+	// This avoids dereferencing funcval.fn on arm64e, where it may be PAC-signed
+	// and not valid to execute with a plain BR.
+	res := make([]byte, 0, 40)
+	for _, w := range loadAddrToX26(to) {
 		var ins [4]byte
 		binary.LittleEndian.PutUint32(ins[:], w)
 		res = append(res, ins[:]...)
 	}
-	res = append(res, []byte{0x11, 0x02, 0x40, 0xF9}...) // LDR x17, [x16]
-	res = append(res, []byte{0x20, 0x02, 0x1F, 0xD6}...) // BR x17
+	code := replacementCode
+	if code == 0 {
+		// Fallback to old behavior if the code pointer is missing.
+		res = append(res, []byte{0x50, 0x03, 0x40, 0xF9}...) // LDR x16, [x26]
+		res = append(res, []byte{0x00, 0x02, 0x1F, 0xD6}...) // BR x16
+		return res
+	}
+	for _, w := range loadAddrToX16(code) {
+		var ins [4]byte
+		binary.LittleEndian.PutUint32(ins[:], w)
+		res = append(res, ins[:]...)
+	}
+	res = append(res, []byte{0x00, 0x02, 0x1F, 0xD6}...) // BR x16
 	return res
 }
 

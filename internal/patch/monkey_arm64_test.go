@@ -9,7 +9,7 @@ func TestJmpToFunctionValue_ShortJump_LDRLiteralAndBR(t *testing.T) {
 	from := uintptr(0x1000_0000)
 	to := from + 4 + 0x100 // delta=0x100, imm19=0x40
 
-	out := jmpToFunctionValue(from, to)
+	out := jmpToFunctionValue(from, to, 0)
 	if len(out) != 8 {
 		t.Fatalf("unexpected len=%d, want 8, out=%x", len(out), out)
 	}
@@ -32,19 +32,19 @@ func TestJmpToFunctionValue_Fallback_LongForm(t *testing.T) {
 	from := uintptr(0x1000_0000)
 	to := from + 4 + (2 << 20) // 2MB away -> out of +/-1MB literal range
 
-	out := jmpToFunctionValue(from, to)
+	out := jmpToFunctionValue(from, to, 0)
 	if len(out) != 24 {
 		t.Fatalf("unexpected len=%d, want 24, out=%x", len(out), out)
 	}
 
 	// ... MOVZ/MOVK x26 ... (16 bytes)
-	// LDR x10, [x26] (4 bytes) then BR x10 (4 bytes)
+	// LDR x16, [x26] (4 bytes) then BR x16 (4 bytes)
 	ldr := binary.LittleEndian.Uint32(out[16:20])
-	if ldr != 0xF940034A { // LDR X10, [X26]
-		t.Fatalf("unexpected LDR [x26] ins=0x%08x want=0x%08x out=%x", ldr, uint32(0xF940034A), out)
+	if ldr != 0xF9400350 { // LDR X16, [X26]
+		t.Fatalf("unexpected LDR [x26] ins=0x%08x want=0x%08x out=%x", ldr, uint32(0xF9400350), out)
 	}
 	br := binary.LittleEndian.Uint32(out[20:24])
-	if br != 0xD61F0140 { // BR X10
-		t.Fatalf("unexpected BR ins=0x%08x want=0x%08x out=%x", br, uint32(0xD61F0140), out)
+	if br != 0xD61F0200 { // BR X16
+		t.Fatalf("unexpected BR ins=0x%08x want=0x%08x out=%x", br, uint32(0xD61F0200), out)
 	}
 }
