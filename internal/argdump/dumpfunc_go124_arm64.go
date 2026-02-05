@@ -59,24 +59,6 @@ func (r *regArgs) intRegArgAddr(reg int, argSize uintptr) unsafe.Pointer {
 	return unsafe.Pointer(&r.Ints[reg])
 }
 
-// bitVector must agree with reflect.bitVector (and runtime.bitvector expectations).
-// runtime reads {n int32; bytedata *uint8} where bytedata points at the slice data.
-type bitVector struct {
-	n    uint32
-	data []byte
-}
-
-func (bv *bitVector) append(bit uint8) {
-	// Runtime requires pointer masks to be a multiple of uintptr in size.
-	if bv.n%(8*uint32(ptrSize)) == 0 {
-		for i := uintptr(0); i < ptrSize; i++ {
-			bv.data = append(bv.data, 0)
-		}
-	}
-	bv.data[bv.n/8] |= bit << (bv.n % 8)
-	bv.n++
-}
-
 // makeFuncCtxt matches reflect.makeFuncCtxt prefix (layout-sensitive).
 type makeFuncCtxt struct {
 	fn      uintptr
@@ -470,25 +452,6 @@ func dumpPanic(v interface{}, _ abijson.Options) {
 //go:linkname runtimeReflectcall runtime.reflectcall
 func runtimeReflectcall(stackArgsType unsafe.Pointer, fn, stackArgs unsafe.Pointer, stackArgsSize, stackRetOffset, frameSize uint32, regArgs *regArgs)
 
-func rtypePtr(t reflect.Type) unsafe.Pointer {
-	// reflect.Type is an interface. Its data word is *rtype.
-	type iface struct {
-		tab  unsafe.Pointer
-		data unsafe.Pointer
-	}
-	return (*iface)(unsafe.Pointer(&t)).data
-}
-
-type eface struct {
-	typ  unsafe.Pointer
-	data unsafe.Pointer
-}
-
-func packEface(typ, data unsafe.Pointer) interface{} {
-	e := eface{typ: typ, data: data}
-	return *(*interface{})(unsafe.Pointer(&e))
-}
-
 // --- ABI layout (reflect/abi.go-derived; uses reflect.Type, not reflect.Value) ---
 
 type abiStepKind int
@@ -847,55 +810,6 @@ func (a abiDesc) zeroRets(fnType reflect.Type, frame unsafe.Pointer, regs *regAr
 	}
 }
 
-func addTypeBits(bv *bitVector, offset uintptr, t reflect.Type) {
-	if !typeHasPointers(t) {
-		return
-	}
-	switch t.Kind() {
-	case reflect.Chan, reflect.Func, reflect.Map, kindPointer, reflect.Slice, reflect.String, reflect.UnsafePointer:
-		for bv.n < uint32(offset/ptrSize) {
-			bv.append(0)
-		}
-		bv.append(1)
-	case reflect.Interface:
-		for bv.n < uint32(offset/ptrSize) {
-			bv.append(0)
-		}
-		bv.append(1)
-		bv.append(1)
-	case reflect.Array:
-		for i := 0; i < t.Len(); i++ {
-			addTypeBits(bv, offset+uintptr(i)*t.Elem().Size(), t.Elem())
-		}
-	case reflect.Struct:
-		for i := 0; i < t.NumField(); i++ {
-			f := t.Field(i)
-			addTypeBits(bv, offset+uintptr(f.Offset), f.Type)
-		}
-	}
-}
-
-func typeHasPointers(t reflect.Type) bool {
-	switch t.Kind() {
-	case reflect.Chan, reflect.Func, reflect.Map, kindPointer, reflect.Slice, reflect.String,
-		reflect.Interface, reflect.UnsafePointer:
-		return true
-	case reflect.Array:
-		return typeHasPointers(t.Elem())
-	case reflect.Struct:
-		for i := 0; i < t.NumField(); i++ {
-			if typeHasPointers(t.Field(i).Type) {
-				return true
-			}
-		}
-		return false
-	default:
-		return false
-	}
-}
-
-func align(x, n uintptr) uintptr { return (x + n - 1) &^ (n - 1) }
-
 func memmove(to, from unsafe.Pointer, n uintptr) {
 	if n == 0 {
 		return
@@ -907,19 +821,6 @@ func memmove(to, from unsafe.Pointer, n uintptr) {
 	copy(unsafe.Slice((*byte)(to), ni), unsafe.Slice((*byte)(from), ni))
 }
 
-func memclr(p unsafe.Pointer, n uintptr) {
-	if n == 0 {
-		return
-	}
-	ni := int(n)
-	if uintptr(ni) != n {
-		panic("argdump: memclr size overflow")
-	}
-	b := unsafe.Slice((*byte)(p), ni)
-	for i := range b {
-		b[i] = 0
-	}
-}
 
 func archFloat32FromReg(reg uint64) float32 {
 	i := uint32(reg)

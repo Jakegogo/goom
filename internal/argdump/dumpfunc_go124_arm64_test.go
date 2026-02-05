@@ -70,6 +70,7 @@ func TestMakeDumpFunc_PrintsArgsAndReturnsZero(t *testing.T) {
 	if os.Getenv("ARGDUMP_DEBUG") == "1" {
 		_, _ = os.Stderr.WriteString("dump:\n" + out + "\n")
 	}
+	print(out)
 	if !strings.Contains(out, "arg0=") || !strings.Contains(out, "arg1=") || !strings.Contains(out, "arg2=") || !strings.Contains(out, "arg3=") {
 		t.Fatalf("unexpected stdout:\n%s", out)
 	}

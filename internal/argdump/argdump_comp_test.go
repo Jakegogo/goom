@@ -1,6 +1,6 @@
-// Package mocker_test 对 mocker 包的测试
+// Package argdump_test 对 argdump 包的测试
 // 当前文件实现了对 internal/argdump 的单测对于不同 go 版本的兼容性测试（自动下载对应 Go 版本）。
-package mocker_test
+package argdump_test
 
 import (
 	"fmt"
@@ -157,7 +157,7 @@ func TestArgdumpCompatibility(t *testing.T) {
 		}
 
 		// Run only argdump tests. PatchFunc tests are opt-in via ARGDUMP_ENABLE_PATCH_TEST.
-		if err := test.Run(v, logHandler, "test", "-v", "-gcflags=all=-l", "-run=^TestUnit", "./internal/argdump"); err != nil {
+		if err := test.Run(v, logHandler, "test", "-v", "-gcflags=all=-l", "-run=^TestUnit", "./"); err != nil {
 			t.Errorf("[%s] run error: %v, see details in the log above.", v, err)
 			break
 		}

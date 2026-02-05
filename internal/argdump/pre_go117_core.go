@@ -24,21 +24,6 @@ import (
 
 const ptrSize = uintptr(unsafe.Sizeof(uintptr(0)))
 
-// NOTE: must agree with runtime.bitvector expectations for go1.13-go1.16.
-// (Matches go1.16 reflect.bitVector.)
-type bitVector struct {
-	n    uint32
-	data []byte
-}
-
-func (bv *bitVector) append(bit uint8) {
-	if bv.n%8 == 0 {
-		bv.data = append(bv.data, 0)
-	}
-	bv.data[bv.n/8] |= bit << (bv.n % 8)
-	bv.n++
-}
-
 // makeFuncCtxt matches the prefix of go1.13-go1.16 reflect.makeFuncImpl.
 type makeFuncCtxt struct {
 	fn     uintptr
@@ -246,24 +231,6 @@ func dumpPanic(v interface{}) {
 //go:linkname runtimeReflectcall runtime.reflectcall
 func runtimeReflectcall(argtype unsafe.Pointer, fn, arg unsafe.Pointer, argsize uint32, retoffset uint32)
 
-func rtypePtr(t reflect.Type) unsafe.Pointer {
-	type iface struct {
-		tab  unsafe.Pointer
-		data unsafe.Pointer
-	}
-	return (*iface)(unsafe.Pointer(&t)).data
-}
-
-type eface struct {
-	typ  unsafe.Pointer
-	data unsafe.Pointer
-}
-
-func packEface(typ, data unsafe.Pointer) interface{} {
-	e := eface{typ: typ, data: data}
-	return *(*interface{})(unsafe.Pointer(&e))
-}
-
 type abiDesc struct {
 	stackCallArgsSize uintptr
 	retOffset         uintptr
@@ -272,8 +239,6 @@ type abiDesc struct {
 	inOffs  []uintptr
 	outOffs []uintptr
 }
-
-func align(x, a uintptr) uintptr { return (x + a - 1) &^ (a - 1) }
 
 func newAbiDescFromFuncType(t reflect.Type) abiDesc {
 	ptrmap := new(bitVector)
@@ -335,58 +300,3 @@ func (a abiDesc) zeroRets(fnType reflect.Type, frame unsafe.Pointer) {
 	}
 }
 
-func typeHasPointers(t reflect.Type) bool {
-	switch t.Kind() {
-	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Ptr, reflect.Slice, reflect.String, reflect.UnsafePointer:
-		return true
-	case reflect.Array:
-		return typeHasPointers(t.Elem())
-	case reflect.Struct:
-		for i := 0; i < t.NumField(); i++ {
-			if typeHasPointers(t.Field(i).Type) {
-				return true
-			}
-		}
-		return false
-	default:
-		return false
-	}
-}
-
-func addTypeBits(bv *bitVector, offset uintptr, t reflect.Type) {
-	if !typeHasPointers(t) {
-		return
-	}
-	switch t.Kind() {
-	case reflect.Chan, reflect.Func, reflect.Map, reflect.Ptr, reflect.Slice, reflect.String, reflect.UnsafePointer:
-		for bv.n < uint32(offset/ptrSize) {
-			bv.append(0)
-		}
-		bv.append(1)
-	case reflect.Interface:
-		for bv.n < uint32(offset/ptrSize) {
-			bv.append(0)
-		}
-		bv.append(1)
-		bv.append(1)
-	case reflect.Array:
-		elem := t.Elem()
-		for i := 0; i < t.Len(); i++ {
-			addTypeBits(bv, offset+uintptr(i)*elem.Size(), elem)
-		}
-	case reflect.Struct:
-		for i := 0; i < t.NumField(); i++ {
-			f := t.Field(i)
-			addTypeBits(bv, offset+f.Offset, f.Type)
-		}
-	}
-}
-
-func memclr(p unsafe.Pointer, n uintptr) {
-	if n == 0 {
-		return
-	}
-	for i := uintptr(0); i < n; i++ {
-		*(*byte)(unsafe.Pointer(uintptr(p) + i)) = 0
-	}
-}

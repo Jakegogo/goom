@@ -31,24 +31,6 @@ import (
 //
 // PatchFunc for arbitrary targets is intentionally disabled pre-go1.24 (see patchfunc_go117_to_go123_stub.go).
 
-// bitVector must agree with reflect.bitVector for go1.17-go1.23.
-// Runtime reads {n uint32; bytedata *uint8} where bytedata points at the slice data.
-type bitVector struct {
-	n    uint32
-	data []byte
-}
-
-func (bv *bitVector) append(bit uint8) {
-	// Keep pointer masks aligned to uintptr boundaries (safe across versions).
-	if bv.n%(8*uint32(ptrSize)) == 0 {
-		for i := uintptr(0); i < ptrSize; i++ {
-			bv.data = append(bv.data, 0)
-		}
-	}
-	bv.data[bv.n/8] |= bit << (bv.n % 8)
-	bv.n++
-}
-
 // makeFuncCtxt matches reflect.makeFuncCtxt prefix (layout-sensitive for go1.17+).
 type makeFuncCtxt struct {
 	fn      uintptr
@@ -354,8 +336,6 @@ type abiDesc struct {
 	outOffs []uintptr
 }
 
-func align(x, a uintptr) uintptr { return (x + a - 1) &^ (a - 1) }
-
 func newAbiDescFromFuncType(t reflect.Type) abiDesc {
 	ptrmap := new(bitVector)
 	offset := uintptr(0)
@@ -426,74 +406,3 @@ func (b *intArgRegBitmap) Get(i int) bool {
 	return b[i/8]&(uint8(1)<<(i%8)) != 0
 }
 
-func rtypePtr(t reflect.Type) unsafe.Pointer {
-	type iface struct {
-		tab  unsafe.Pointer
-		data unsafe.Pointer
-	}
-	return (*iface)(unsafe.Pointer(&t)).data
-}
-
-type eface struct {
-	typ  unsafe.Pointer
-	data unsafe.Pointer
-}
-
-func packEface(typ, data unsafe.Pointer) interface{} {
-	e := eface{typ: typ, data: data}
-	return *(*interface{})(unsafe.Pointer(&e))
-}
-
-func typeHasPointers(t reflect.Type) bool {
-	switch t.Kind() {
-	case reflect.Chan, reflect.Func, reflect.Map, kindPointer, reflect.Slice, reflect.String,
-		reflect.Interface, reflect.UnsafePointer:
-		return true
-	case reflect.Array:
-		return typeHasPointers(t.Elem())
-	case reflect.Struct:
-		for i := 0; i < t.NumField(); i++ {
-			if typeHasPointers(t.Field(i).Type) {
-				return true
-			}
-		}
-		return false
-	default:
-		return false
-	}
-}
-
-func addTypeBits(bv *bitVector, offset uintptr, t reflect.Type) {
-	if !typeHasPointers(t) {
-		return
-	}
-	switch t.Kind() {
-	case reflect.Chan, reflect.Func, reflect.Map, kindPointer, reflect.Slice, reflect.String, reflect.UnsafePointer:
-		for bv.n < uint32(offset/ptrSize) {
-			bv.append(0)
-		}
-		bv.append(1)
-	case reflect.Interface:
-		for bv.n < uint32(offset/ptrSize) {
-			bv.append(0)
-		}
-		bv.append(1)
-		bv.append(1)
-	case reflect.Array:
-		for i := 0; i < t.Len(); i++ {
-			addTypeBits(bv, offset+uintptr(i)*t.Elem().Size(), t.Elem())
-		}
-	case reflect.Struct:
-		for i := 0; i < t.NumField(); i++ {
-			f := t.Field(i)
-			addTypeBits(bv, offset+uintptr(f.Offset), f.Type)
-		}
-	}
-}
-
-func memclr(p unsafe.Pointer, n uintptr) {
-	b := unsafe.Slice((*byte)(p), n)
-	for i := range b {
-		b[i] = 0
-	}
-}
