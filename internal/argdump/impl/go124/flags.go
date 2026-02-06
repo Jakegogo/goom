@@ -1,5 +1,5 @@
-//go:build go1.24
-// +build go1.24
+//go:build go1.24 && arm64
+// +build go1.24,arm64
 
 package go124
 

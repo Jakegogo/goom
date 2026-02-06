@@ -4,14 +4,14 @@
 package pre117
 
 import (
-	"encoding/json"
 	"fmt"
 	"reflect"
 	"sync"
 	"unsafe"
 
-	"github.com/tencent/goom/internal/abijson"
 	"github.com/tencent/goom/internal/argdump/abi"
+	"github.com/tencent/goom/internal/argdump/abijson"
+	"github.com/tencent/goom/internal/argdump/impl/shared"
 	"github.com/tencent/goom/internal/argdump/internal/bitvec"
 	"github.com/tencent/goom/internal/argdump/internal/flags"
 	"github.com/tencent/goom/internal/argdump/internal/mem"
@@ -60,22 +60,8 @@ var (
 	magicSentinel = new(int)
 )
 
-//go:noinline
-func callReflectTrampolineHolder(ctxt unsafe.Pointer, frame unsafe.Pointer, retValid *bool) {
-	var x uintptr
-	x ^= uintptr(ctxt)
-	x ^= uintptr(frame)
-	if retValid != nil && *retValid {
-		x++
-	}
-	for i := 0; i < 64; i++ {
-		// Keep constants within 32-bit uintptr range (also fine on 64-bit).
-		x ^= uintptr(i) * uintptr(0x9e3779b9)
-	}
-	if x == 0xdeadbeef {
-		panic("unreachable")
-	}
-}
+// callReflectTrampolineHolder is an alias for the shared pre-Go1.17 trampoline holder.
+var callReflectTrampolineHolder = shared.CallReflectTrampolineHolderPreGo117
 
 func ensureCallReflectPatched() {
 	patchOnce.Do(func() {
@@ -213,23 +199,7 @@ func dumpArgsAndMaybeCall(impl *DumpFuncImpl, frame unsafe.Pointer, retValid *bo
 }
 
 func dumpPanic(v interface{}) {
-	if v == nil {
-		fmt.Printf("panic=%s\n", "null")
-		return
-	}
-	var s string
-	switch x := v.(type) {
-	case string:
-		s = x
-	case error:
-		s = x.Error()
-	case interface{ String() string }:
-		s = x.String()
-	default:
-		s = fmt.Sprintf("%T: %v", v, v)
-	}
-	b, _ := json.Marshal(s)
-	fmt.Printf("panic=%s\n", string(b))
+	shared.DumpPanic(v)
 }
 
 //go:linkname runtimeReflectcall runtime.reflectcall

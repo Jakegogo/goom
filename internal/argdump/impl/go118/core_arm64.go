@@ -4,7 +4,6 @@
 package go118
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"reflect"
@@ -12,8 +11,9 @@ import (
 	"sync"
 	"unsafe"
 
-	"github.com/tencent/goom/internal/abijson"
 	"github.com/tencent/goom/internal/argdump/abi"
+	"github.com/tencent/goom/internal/argdump/abijson"
+	"github.com/tencent/goom/internal/argdump/impl/shared"
 	"github.com/tencent/goom/internal/argdump/internal/bitvec"
 	"github.com/tencent/goom/internal/argdump/internal/flags"
 	"github.com/tencent/goom/internal/argdump/internal/mem"
@@ -25,13 +25,8 @@ import (
 	"github.com/tencent/goom/internal/unexports2"
 )
 
-// intArgRegBitmap matches internal/abi.IntArgRegBitmap.
-type intArgRegBitmap [(abi.IntArgRegs + 7) / 8]uint8
-
-func (b *intArgRegBitmap) Set(i int) { b[i/8] |= uint8(1) << (i % 8) }
-func (b *intArgRegBitmap) Get(i int) bool {
-	return b[i/8]&(uint8(1)<<(i%8)) != 0
-}
+// intArgRegBitmap is an alias for shared.IntArgRegBitmap.
+type intArgRegBitmap = shared.IntArgRegBitmap
 
 // regArgs matches internal/abi.RegArgs (layout-sensitive).
 type regArgs struct {
@@ -167,24 +162,8 @@ func ensureCallReflectPatched() {
 	})
 }
 
-//go:noinline
-func callReflectTrampolineHolder(ctxt unsafe.Pointer, frame unsafe.Pointer, retValid *bool, regs unsafe.Pointer) {
-	var x uintptr
-	x ^= uintptr(unsafe.Pointer(ctxt))
-	x ^= uintptr(unsafe.Pointer(frame))
-	if retValid != nil && *retValid {
-		x++
-	}
-	if regs != nil {
-		x ^= uintptr(regs)
-	}
-	for i := 0; i < 64; i++ {
-		x ^= uintptr(i) * 0x9e3779b97f4a7c15
-	}
-	if x == 0xdeadbeef {
-		panic("unreachable")
-	}
-}
+// callReflectTrampolineHolder is an alias for the shared trampoline holder.
+var callReflectTrampolineHolder = shared.CallReflectTrampolineHolder
 
 func callDump(ctxt unsafe.Pointer, frame unsafe.Pointer, retValid *bool, regs unsafe.Pointer) {
 	if flags.DebugEnabled {
@@ -345,23 +324,7 @@ func dumpReturns(impl *DumpFuncImpl, frame unsafe.Pointer, regs *regArgs, opt ab
 }
 
 func dumpPanic(v interface{}, _ abijson.Options) {
-	if v == nil {
-		fmt.Printf("panic=%s\n", "null")
-		return
-	}
-	var s string
-	switch x := v.(type) {
-	case string:
-		s = x
-	case error:
-		s = x.Error()
-	case interface{ String() string }:
-		s = x.String()
-	default:
-		s = fmt.Sprintf("%T: %v", v, v)
-	}
-	b, _ := json.Marshal(s)
-	fmt.Printf("panic=%s\n", string(b))
+	shared.DumpPanic(v)
 }
 
 //go:linkname runtimeReflectcall runtime.reflectcall

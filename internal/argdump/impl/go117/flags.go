@@ -1,5 +1,5 @@
-//go:build go1.17 && !go1.18
-// +build go1.17,!go1.18
+//go:build go1.17 && !go1.18 && arm64
+// +build go1.17,!go1.18,arm64
 
 package go117
 

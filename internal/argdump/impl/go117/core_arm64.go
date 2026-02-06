@@ -4,15 +4,15 @@
 package go117
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"reflect"
 	"sync"
 	"unsafe"
 
-	"github.com/tencent/goom/internal/abijson"
 	"github.com/tencent/goom/internal/argdump/abi"
+	"github.com/tencent/goom/internal/argdump/abijson"
+	"github.com/tencent/goom/internal/argdump/impl/shared"
 	"github.com/tencent/goom/internal/argdump/internal/bitvec"
 	"github.com/tencent/goom/internal/argdump/internal/flags"
 	"github.com/tencent/goom/internal/argdump/internal/mem"
@@ -56,24 +56,8 @@ var (
 	magicSentinel = new(int)
 )
 
-//go:noinline
-func callReflectTrampolineHolder(ctxt unsafe.Pointer, frame unsafe.Pointer, retValid *bool, regs unsafe.Pointer) {
-	var x uintptr
-	x ^= uintptr(ctxt)
-	x ^= uintptr(frame)
-	if retValid != nil && *retValid {
-		x++
-	}
-	if regs != nil {
-		x ^= uintptr(regs)
-	}
-	for i := 0; i < 64; i++ {
-		x ^= uintptr(i) * 0x9e3779b97f4a7c15
-	}
-	if x == 0xdeadbeef {
-		panic("unreachable")
-	}
-}
+// callReflectTrampolineHolder is an alias for the shared trampoline holder.
+var callReflectTrampolineHolder = shared.CallReflectTrampolineHolder
 
 func ensureCallReflectPatched() {
 	patchOnce.Do(func() {
@@ -244,23 +228,7 @@ func dumpArgsAndZeroRets(impl *DumpFuncImpl, frame unsafe.Pointer, retValid *boo
 }
 
 func dumpPanic(v interface{}) {
-	if v == nil {
-		fmt.Printf("panic=%s\n", "null")
-		return
-	}
-	var s string
-	switch x := v.(type) {
-	case string:
-		s = x
-	case error:
-		s = x.Error()
-	case interface{ String() string }:
-		s = x.String()
-	default:
-		s = fmt.Sprintf("%T: %v", v, v)
-	}
-	b, _ := json.Marshal(s)
-	fmt.Printf("panic=%s\n", string(b))
+	shared.DumpPanic(v)
 }
 
 type abiDesc struct {
@@ -332,9 +300,5 @@ func (a abiDesc) zeroRets(fnType reflect.Type, frame unsafe.Pointer) {
 	}
 }
 
-type intArgRegBitmap [(abi.IntArgRegs + 7) / 8]uint8
-
-func (b *intArgRegBitmap) Set(i int) { b[i/8] |= uint8(1) << (i % 8) }
-func (b *intArgRegBitmap) Get(i int) bool {
-	return b[i/8]&(uint8(1)<<(i%8)) != 0
-}
+// intArgRegBitmap is an alias for shared.IntArgRegBitmap.
+type intArgRegBitmap = shared.IntArgRegBitmap

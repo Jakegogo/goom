@@ -5,7 +5,7 @@ module github.com/tencent/goom
 // with "module requires Go X".
 //
 // Feature/ABI differences are handled via build tags in code, not via the go.mod directive.
-go 1.18
+go 1.25
 
 require github.com/stretchr/testify v1.4.0
 
