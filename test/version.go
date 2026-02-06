@@ -125,7 +125,7 @@ func install(targetDir, version string) error {
 			// Something weird. Don't try to download.
 			return err2
 		}
-		if err3 := copyFromURL(archiveFile, goURL); err3 != nil {
+		if err3 := copyFromURL(archiveFile, goURL, res.ContentLength); err3 != nil {
 			return fmt.Errorf("error downloading %v: %v", goURL, err3)
 		}
 		fi, err2 = os.Stat(archiveFile)
@@ -334,18 +334,33 @@ func slurpURLToString(uRL string) (string, error) {
 	return string(slurp), nil
 }
 
-// copyFromURL downloads srcURL to dstFile.
-func copyFromURL(dstFile, srcURL string) (err error) {
-	f, err := os.Create(dstFile)
+// copyFromURL downloads srcURL to dstFile with best-effort resume support.
+func copyFromURL(dstFile, srcURL string, expectedSize int64) (err error) {
+	var startOffset int64
+	if fi, statErr := os.Stat(dstFile); statErr == nil {
+		startOffset = fi.Size()
+		if expectedSize > 0 && startOffset > expectedSize {
+			_ = os.Remove(dstFile)
+			startOffset = 0
+		}
+		if expectedSize > 0 && startOffset == expectedSize {
+			return nil
+		}
+	}
+
+	f, err := os.OpenFile(dstFile, os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return err
 	}
 	defer func() {
-		if err != nil {
-			_ = f.Close()
-			_ = os.Remove(dstFile)
-		}
+		_ = f.Close()
 	}()
+
+	if startOffset > 0 {
+		if _, err = f.Seek(startOffset, io.SeekStart); err != nil {
+			return err
+		}
+	}
 	c := &http.Client{
 		Transport: &userAgentTransport{&http.Transport{
 			// It's already compressed. Prefer accurate ContentLength.
@@ -355,17 +370,38 @@ func copyFromURL(dstFile, srcURL string) (err error) {
 			Proxy:              http.ProxyFromEnvironment,
 		}},
 	}
-	res, err := c.Get(srcURL)
+	req, err := http.NewRequest(http.MethodGet, srcURL, nil)
+	if err != nil {
+		return err
+	}
+	if startOffset > 0 {
+		req.Header.Set("Range", fmt.Sprintf("bytes=%d-", startOffset))
+	}
+	res, err := c.Do(req)
 	if err != nil {
 		return err
 	}
 	defer func() {
 		_ = res.Body.Close()
 	}()
-	if res.StatusCode != http.StatusOK {
+	if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusPartialContent {
 		return errors.New(res.Status)
 	}
-	pw := &progressWriter{w: f, total: res.ContentLength}
+	if startOffset > 0 && res.StatusCode == http.StatusOK {
+		// Server ignored Range; restart from scratch.
+		if err := f.Truncate(0); err != nil {
+			return err
+		}
+		if _, err := f.Seek(0, io.SeekStart); err != nil {
+			return err
+		}
+		startOffset = 0
+	}
+	total := expectedSize
+	if total <= 0 {
+		total = res.ContentLength + startOffset
+	}
+	pw := &progressWriter{w: f, total: total, n: startOffset}
 	n, err := io.Copy(pw, res.Body)
 	if err != nil {
 		return err
@@ -385,6 +421,10 @@ type progressWriter struct {
 }
 
 func (p *progressWriter) update() {
+	if p.total <= 0 {
+		_, _ = fmt.Fprintf(os.Stderr, "Downloaded %d bytes ...\n", p.n)
+		return
+	}
 	end := " ..."
 	if p.n == p.total {
 		end = ""

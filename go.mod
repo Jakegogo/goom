@@ -5,12 +5,6 @@ module github.com/tencent/goom
 // with "module requires Go X".
 //
 // Feature/ABI differences are handled via build tags in code, not via the go.mod directive.
-go 1.25
+go 1.18
 
 require github.com/stretchr/testify v1.4.0
-
-require (
-	github.com/davecgh/go-spew v1.1.0 // indirect
-	github.com/pmezard/go-difflib v1.0.0 // indirect
-	gopkg.in/yaml.v2 v2.2.2 // indirect
-)

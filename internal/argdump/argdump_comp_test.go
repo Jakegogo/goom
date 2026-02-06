@@ -99,7 +99,14 @@ func hasDownloadedToolchain(version string) bool {
 
 func mustHaveTimeForDownload(t *testing.T, version string) bool {
 	t.Helper()
-	dl, ok := t.Deadline()
+	type deadlineTester interface {
+		Deadline() (time.Time, bool)
+	}
+	dt, ok := interface{}(t).(deadlineTester)
+	if !ok {
+		return true
+	}
+	dl, ok := dt.Deadline()
 	if !ok {
 		return true
 	}
@@ -161,7 +168,7 @@ func TestArgdumpCompatibility(t *testing.T) {
 		}
 
 		// Run only argdump tests. PatchFunc tests are opt-in via ARGDUMP_ENABLE_PATCH_TEST.
-		if err := test.Run(v, logHandler, "test", "-v", "-gcflags=all=-l", "-run=^TestUnit", "./"); err != nil {
+		if err := test.Run(v, logHandler, "test", "-v", "-gcflags=all=-l", "-ldflags=-s=false", "-run=^TestUnit", "./"); err != nil {
 			t.Errorf("[%s] run error: %v, see details in the log above.", v, err)
 			break
 		}
