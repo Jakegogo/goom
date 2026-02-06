@@ -76,10 +76,10 @@ func add(a int, b int, info Info) int {
 }
 
 func TestPatchFunc_PreGo124_PrintsArgsAndPreservesReturn_WithStruct(t *testing.T) {
-	argdump.DebugEnabled = os.Getenv("ARGDUMP_DEBUG") == "1"
-	prevDump := argdump.DumpEnabled
-	argdump.DumpEnabled = true
-	defer func() { argdump.DumpEnabled = prevDump }()
+	*argdump.DebugEnabled =os.Getenv("ARGDUMP_DEBUG") == "1"
+	prevDump := *argdump.DumpEnabled
+	*argdump.DumpEnabled =true
+	defer func() { *argdump.DumpEnabled =prevDump }()
 
 	guard, err := argdump.PatchFunc(add)
 	if err != nil {
@@ -112,10 +112,10 @@ func multiReturnFloat(a int, f float64, s string) (int, float64, string) {
 }
 
 func TestPatchFunc_PreGo124_MultiReturnAndFloat(t *testing.T) {
-	argdump.DebugEnabled = os.Getenv("ARGDUMP_DEBUG") == "1"
-	prevDump := argdump.DumpEnabled
-	argdump.DumpEnabled = true
-	defer func() { argdump.DumpEnabled = prevDump }()
+	*argdump.DebugEnabled =os.Getenv("ARGDUMP_DEBUG") == "1"
+	prevDump := *argdump.DumpEnabled
+	*argdump.DumpEnabled =true
+	defer func() { *argdump.DumpEnabled =prevDump }()
 
 	guard, err := argdump.PatchFunc(multiReturnFloat)
 	if err != nil {
@@ -153,10 +153,10 @@ type Deep1 struct{ d Deep2 }
 func returnsDeep(x Deep1) Deep1 { return x }
 
 func TestPatchFunc_PreGo124_MaxDepth3(t *testing.T) {
-	argdump.DebugEnabled = os.Getenv("ARGDUMP_DEBUG") == "1"
-	prevDump := argdump.DumpEnabled
-	argdump.DumpEnabled = true
-	defer func() { argdump.DumpEnabled = prevDump }()
+	*argdump.DebugEnabled =os.Getenv("ARGDUMP_DEBUG") == "1"
+	prevDump := *argdump.DumpEnabled
+	*argdump.DumpEnabled =true
+	defer func() { *argdump.DumpEnabled =prevDump }()
 
 	guard, err := argdump.PatchFunc(returnsDeep)
 	if err != nil {
@@ -184,10 +184,10 @@ func variadicSum(prefix string, nums ...int) int {
 }
 
 func TestPatchFunc_PreGo124_Variadic(t *testing.T) {
-	argdump.DebugEnabled = os.Getenv("ARGDUMP_DEBUG") == "1"
-	prevDump := argdump.DumpEnabled
-	argdump.DumpEnabled = true
-	defer func() { argdump.DumpEnabled = prevDump }()
+	*argdump.DebugEnabled =os.Getenv("ARGDUMP_DEBUG") == "1"
+	prevDump := *argdump.DumpEnabled
+	*argdump.DumpEnabled =true
+	defer func() { *argdump.DumpEnabled =prevDump }()
 
 	guard, err := argdump.PatchFunc(variadicSum)
 	if err != nil {
@@ -219,10 +219,10 @@ func willPanic(a int, msg string) int {
 }
 
 func TestPatchFunc_PreGo124_PanicPropagatesAndRemainsActive(t *testing.T) {
-	argdump.DebugEnabled = os.Getenv("ARGDUMP_DEBUG") == "1"
-	prevDump := argdump.DumpEnabled
-	argdump.DumpEnabled = true
-	defer func() { argdump.DumpEnabled = prevDump }()
+	*argdump.DebugEnabled =os.Getenv("ARGDUMP_DEBUG") == "1"
+	prevDump := *argdump.DumpEnabled
+	*argdump.DumpEnabled =true
+	defer func() { *argdump.DumpEnabled =prevDump }()
 
 	guard, err := argdump.PatchFunc(willPanic)
 	if err != nil {
@@ -250,10 +250,10 @@ func TestPatchFunc_PreGo124_PanicPropagatesAndRemainsActive(t *testing.T) {
 }
 
 func TestPatchFunc_PreGo124_Closure(t *testing.T) {
-	argdump.DebugEnabled = os.Getenv("ARGDUMP_DEBUG") == "1"
-	prevDump := argdump.DumpEnabled
-	argdump.DumpEnabled = true
-	defer func() { argdump.DumpEnabled = prevDump }()
+	*argdump.DebugEnabled =os.Getenv("ARGDUMP_DEBUG") == "1"
+	prevDump := *argdump.DumpEnabled
+	*argdump.DumpEnabled =true
+	defer func() { *argdump.DumpEnabled =prevDump }()
 
 	base := 5
 	clos := func(a int) int { return a + base }
@@ -281,13 +281,13 @@ func TestPatchFunc_PreGo124_Closure(t *testing.T) {
 func multiScalarNoDump(a int, f float64) (int, float64) { return a * 2, f * 1.5 }
 
 func Test_Patched_PreGo124_MultiReturn_NoDump(t *testing.T) {
-	prevDebug := argdump.DebugEnabled
-	prevDump := argdump.DumpEnabled
-	argdump.DebugEnabled = os.Getenv("ARGDUMP_DEBUG") == "1"
-	argdump.DumpEnabled = false
+	prevDebug := *argdump.DebugEnabled
+	prevDump := *argdump.DumpEnabled
+	*argdump.DebugEnabled =os.Getenv("ARGDUMP_DEBUG") == "1"
+	*argdump.DumpEnabled =false
 	defer func() {
-		argdump.DebugEnabled = prevDebug
-		argdump.DumpEnabled = prevDump
+		*argdump.DebugEnabled =prevDebug
+		*argdump.DumpEnabled =prevDump
 	}()
 
 	fn := reflect.ValueOf(multiScalarNoDump)
@@ -310,13 +310,13 @@ func Test_Patched_PreGo124_MultiReturn_NoDump(t *testing.T) {
 }
 
 func Test_Patched_PreGo124_CrossPackage_NoDump(t *testing.T) {
-	prevDebug := argdump.DebugEnabled
-	prevDump := argdump.DumpEnabled
-	argdump.DebugEnabled = os.Getenv("ARGDUMP_DEBUG") == "1"
-	argdump.DumpEnabled = false
+	prevDebug := *argdump.DebugEnabled
+	prevDump := *argdump.DumpEnabled
+	*argdump.DebugEnabled =os.Getenv("ARGDUMP_DEBUG") == "1"
+	*argdump.DumpEnabled =false
 	defer func() {
-		argdump.DebugEnabled = prevDebug
-		argdump.DumpEnabled = prevDump
+		*argdump.DebugEnabled =prevDebug
+		*argdump.DumpEnabled =prevDump
 	}()
 
 	// Warm the symbol so the call site is present.

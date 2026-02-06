@@ -58,8 +58,8 @@ func Benchmark_Patched_Add_DumpToDevNull(b *testing.B) {
 	os.Stdout = devNull
 	defer func() { os.Stdout = old }()
 
-	argdump.DebugEnabled = false
-	argdump.DumpEnabled = true
+	*argdump.DebugEnabled =false
+	*argdump.DumpEnabled =true
 	guard, err := argdump.PatchFunc(benchAdd)
 	if err != nil {
 		b.Fatalf("PatchFunc: %v", err)
@@ -74,8 +74,8 @@ func Benchmark_Patched_Add_DumpToDevNull(b *testing.B) {
 }
 
 func Benchmark_Patched_Add_NoDump(b *testing.B) {
-	argdump.DebugEnabled = false
-	argdump.DumpEnabled = false
+	*argdump.DebugEnabled =false
+	*argdump.DumpEnabled =false
 	// NOTE: NoDump benchmarks intentionally use scalar-only signatures to isolate hook/jump overhead.
 	guard, err := argdump.PatchFunc(benchAddScalar)
 	if err != nil {
@@ -108,8 +108,8 @@ func Benchmark_Patched_MultiReturn_DumpToDevNull(b *testing.B) {
 	os.Stdout = devNull
 	defer func() { os.Stdout = old }()
 
-	argdump.DebugEnabled = false
-	argdump.DumpEnabled = true
+	*argdump.DebugEnabled =false
+	*argdump.DumpEnabled =true
 	guard, err := argdump.PatchFunc(benchMultiReturn)
 	if err != nil {
 		b.Fatalf("PatchFunc: %v", err)
@@ -124,8 +124,8 @@ func Benchmark_Patched_MultiReturn_DumpToDevNull(b *testing.B) {
 }
 
 func Benchmark_Patched_MultiReturn_NoDump(b *testing.B) {
-	argdump.DebugEnabled = false
-	argdump.DumpEnabled = false
+	*argdump.DebugEnabled =false
+	*argdump.DumpEnabled =false
 	// NOTE: NoDump benchmarks intentionally use scalar-only signatures to isolate hook/jump overhead.
 	guard, err := argdump.PatchFunc(benchMultiScalar)
 	if err != nil {

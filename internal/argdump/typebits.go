@@ -1,10 +1,15 @@
 package argdump
 
-import "reflect"
+import (
+	"reflect"
+
+	"github.com/tencent/goom/internal/argdump/abi"
+	"github.com/tencent/goom/internal/argdump/internal/bitvec"
+)
 
 func typeHasPointers(t reflect.Type) bool {
 	switch t.Kind() {
-	case reflect.Chan, reflect.Func, reflect.Map, kindPointer, reflect.Slice, reflect.String,
+	case reflect.Chan, reflect.Func, reflect.Map, abi.KindPointer, reflect.Slice, reflect.String,
 		reflect.Interface, reflect.UnsafePointer:
 		return true
 	case reflect.Array:
@@ -21,22 +26,22 @@ func typeHasPointers(t reflect.Type) bool {
 	}
 }
 
-func addTypeBits(bv *bitVector, offset uintptr, t reflect.Type) {
+func addTypeBits(bv *bitvec.BitVector, offset uintptr, t reflect.Type) {
 	if !typeHasPointers(t) {
 		return
 	}
 	switch t.Kind() {
-	case reflect.Chan, reflect.Func, reflect.Map, kindPointer, reflect.Slice, reflect.String, reflect.UnsafePointer:
-		for bv.n < uint32(offset/ptrSize) {
-			bv.append(0)
+	case reflect.Chan, reflect.Func, reflect.Map, abi.KindPointer, reflect.Slice, reflect.String, reflect.UnsafePointer:
+		for bv.N < uint32(offset/abi.PtrSize) {
+			bv.Append(0)
 		}
-		bv.append(1)
+		bv.Append(1)
 	case reflect.Interface:
-		for bv.n < uint32(offset/ptrSize) {
-			bv.append(0)
+		for bv.N < uint32(offset/abi.PtrSize) {
+			bv.Append(0)
 		}
-		bv.append(1)
-		bv.append(1)
+		bv.Append(1)
+		bv.Append(1)
 	case reflect.Array:
 		for i := 0; i < t.Len(); i++ {
 			addTypeBits(bv, offset+uintptr(i)*t.Elem().Size(), t.Elem())

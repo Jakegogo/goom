@@ -21,7 +21,7 @@ func TestUnitPatchFunc_PreGo117_PrintsArgsAndPreservesReturn(t *testing.T) {
 		t.Skip("set ARGDUMP_ENABLE_PATCH_TEST=1 to run PatchFunc tests")
 	}
 
-	argdump.DebugEnabled = os.Getenv("ARGDUMP_DEBUG") == "1"
+	*argdump.DebugEnabled =os.Getenv("ARGDUMP_DEBUG") == "1"
 
 	guard, err := argdump.PatchFunc(preGo117Add)
 	if err != nil {

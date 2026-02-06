@@ -23,13 +23,13 @@ func TestPatchFunc_PreGo124_PrintsArgsAndPreservesReturn(t *testing.T) {
 	// if os.Getenv("ARGDUMP_ENABLE_PATCH_TEST") != "1" {
 	// 	t.Skip("set ARGDUMP_ENABLE_PATCH_TEST=1 to run PatchFunc tests (PatchFunc requires go1.24+)")
 	// }
-	prevDebug := argdump.DebugEnabled
-	prevDump := argdump.DumpEnabled
-	argdump.DebugEnabled = os.Getenv("ARGDUMP_DEBUG") == "1"
-	argdump.DumpEnabled = true
+	prevDebug := *argdump.DebugEnabled
+	prevDump := *argdump.DumpEnabled
+	*argdump.DebugEnabled =os.Getenv("ARGDUMP_DEBUG") == "1"
+	*argdump.DumpEnabled =true
 	defer func() {
-		argdump.DebugEnabled = prevDebug
-		argdump.DumpEnabled = prevDump
+		*argdump.DebugEnabled =prevDebug
+		*argdump.DumpEnabled =prevDump
 	}()
 
 	guard, err := argdump.PatchFunc(testtargets.CrossPkgAdd)

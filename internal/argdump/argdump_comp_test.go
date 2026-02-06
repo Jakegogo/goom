@@ -51,6 +51,8 @@ func candidateVersions(goos, goarch string) []string {
 			"go1.21.13",
 			"go1.22.12",
 			"go1.23.1",
+			"go1.24.13",
+			"go1.25.7",
 		}
 	}
 	// Other platforms: include go1.13+.
@@ -66,6 +68,8 @@ func candidateVersions(goos, goarch string) []string {
 		"go1.21.13",
 		"go1.22.12",
 		"go1.23.1",
+		"go1.24.13",
+		"go1.25.7",
 	}
 }
 

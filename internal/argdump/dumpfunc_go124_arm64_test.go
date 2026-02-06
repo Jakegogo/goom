@@ -30,9 +30,9 @@ func TestMakeDumpFunc_PrintsArgsAndReturnsZero(t *testing.T) {
 	if os.Getenv("ARGDUMP_DEBUG") == "1" {
 		callReflect, _ := unexports2.FindFuncByName("reflect.callReflect")
 		callReflectAbi0, _ := unexports2.FindFuncByName("reflect.callReflect.abi0")
-		t.Logf("DebugCallReflectPtr=0x%x callReflect=0x%x callReflect.abi0=0x%x", argdump.DebugCallReflectPtr, callReflect, callReflectAbi0)
-		if argdump.DebugCallReflectPtr != 0 {
-			t.Logf("patchedTargetBytes=%s", hex.EncodeToString(memory.RawRead(argdump.DebugCallReflectPtr, 16)))
+		t.Logf("DebugCallReflectPtr=0x%x callReflect=0x%x callReflect.abi0=0x%x", *argdump.DebugCallReflectPtr, callReflect, callReflectAbi0)
+		if *argdump.DebugCallReflectPtr != 0 {
+			t.Logf("patchedTargetBytes=%s", hex.EncodeToString(memory.RawRead(*argdump.DebugCallReflectPtr, 16)))
 		}
 		if callReflect != 0 {
 			t.Logf("sym.callReflect.bytes=%s", hex.EncodeToString(memory.RawRead(callReflect, 16)))

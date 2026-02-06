@@ -81,7 +81,7 @@ func add(a int, b int, info Info) int {
 
 func TestPatchFunc_PrintsArgsAndPreservesReturn(t *testing.T) {
 	// t.Skip("TODO: PatchFunc is not stable on macOS arm64 in this environment (SIGBUS while executing patched code).")
-	argdump.DebugEnabled = os.Getenv("ARGDUMP_DEBUG") == "1"
+	*argdump.DebugEnabled =os.Getenv("ARGDUMP_DEBUG") == "1"
 	guard, err := argdump.PatchFunc(add)
 	if err != nil {
 		t.Fatalf("PatchFunc: %v", err)
@@ -89,17 +89,17 @@ func TestPatchFunc_PrintsArgsAndPreservesReturn(t *testing.T) {
 	if guard.FixOriginFunc() == 0 {
 		t.Fatalf("expected non-zero FixOriginFunc trampoline")
 	}
-	if argdump.DebugLastProxyFuncValPtr == 0 {
+	if *argdump.DebugLastProxyFuncValPtr == 0 {
 		t.Fatalf("debug proxy funcval not set")
 	}
-	if argdump.DebugLastProxyCodePtr != argdump.DebugLastMakeFuncStubPtr {
+	if *argdump.DebugLastProxyCodePtr != *argdump.DebugLastMakeFuncStubPtr {
 		t.Fatalf("proxy code ptr mismatch: funcval=0x%x code=0x%x makeFuncStub=0x%x",
-			argdump.DebugLastProxyFuncValPtr, argdump.DebugLastProxyCodePtr, argdump.DebugLastMakeFuncStubPtr)
+			*argdump.DebugLastProxyFuncValPtr, *argdump.DebugLastProxyCodePtr, *argdump.DebugLastMakeFuncStubPtr)
 	}
 	guard.Apply()
 	defer guard.UnpatchWithLock()
 
-	if argdump.DebugEnabled {
+	if *argdump.DebugEnabled {
 		// --- pre-call diagnostics (stderr) ---
 		origin := guard.OriginFunc()
 		code := memory.RawRead(origin, 32)
@@ -120,22 +120,22 @@ func TestPatchFunc_PrintsArgsAndPreservesReturn(t *testing.T) {
 			)
 		}
 		_, _ = os.Stderr.WriteString(
-			"proxyFuncVal=0x" + strconv.FormatUint(uint64(argdump.DebugLastProxyFuncValPtr), 16) +
-				" makeFuncStub=0x" + strconv.FormatUint(uint64(argdump.DebugLastMakeFuncStubPtr), 16) + "\n",
+			"proxyFuncVal=0x" + strconv.FormatUint(uint64(*argdump.DebugLastProxyFuncValPtr), 16) +
+				" makeFuncStub=0x" + strconv.FormatUint(uint64(*argdump.DebugLastMakeFuncStubPtr), 16) + "\n",
 		)
 		_, _ = os.Stderr.WriteString(
-			"origFuncVal=0x" + strconv.FormatUint(uint64(argdump.DebugOrigFuncValPtr), 16) +
-				" origCode=0x" + strconv.FormatUint(uint64(argdump.DebugOrigCodePtr), 16) + "\n",
+			"origFuncVal=0x" + strconv.FormatUint(uint64(*argdump.DebugOrigFuncValPtr), 16) +
+				" origCode=0x" + strconv.FormatUint(uint64(*argdump.DebugOrigCodePtr), 16) + "\n",
 		)
 		_, _ = os.Stderr.WriteString(
-			"callDump=0x" + strconv.FormatUint(uint64(argdump.DebugCallDumpPtr), 16) +
-				" callReflect=0x" + strconv.FormatUint(uint64(argdump.DebugCallReflectPtr), 16) +
-				" runtime.reflectcall=0x" + strconv.FormatUint(uint64(argdump.DebugRuntimeReflectcallPtr), 16) + "\n",
+			"callDump=0x" + strconv.FormatUint(uint64(*argdump.DebugCallDumpPtr), 16) +
+				" callReflect=0x" + strconv.FormatUint(uint64(*argdump.DebugCallReflectPtr), 16) +
+				" runtime.reflectcall=0x" + strconv.FormatUint(uint64(*argdump.DebugRuntimeReflectcallPtr), 16) + "\n",
 		)
 		_, _ = os.Stderr.WriteString(
-			"runtime.spillArgs=0x" + strconv.FormatUint(uint64(argdump.DebugRuntimeSpillArgsPtr), 16) +
-				" runtime.unspillArgs=0x" + strconv.FormatUint(uint64(argdump.DebugRuntimeUnspillArgsPtr), 16) +
-				" reflect.moveMakeFuncArgPtrs=0x" + strconv.FormatUint(uint64(argdump.DebugMoveMakeFuncArgPtrsPtr), 16) + "\n",
+			"runtime.spillArgs=0x" + strconv.FormatUint(uint64(*argdump.DebugRuntimeSpillArgsPtr), 16) +
+				" runtime.unspillArgs=0x" + strconv.FormatUint(uint64(*argdump.DebugRuntimeUnspillArgsPtr), 16) +
+				" reflect.moveMakeFuncArgPtrs=0x" + strconv.FormatUint(uint64(*argdump.DebugMoveMakeFuncArgPtrsPtr), 16) + "\n",
 		)
 	}
 
@@ -147,7 +147,7 @@ func TestPatchFunc_PrintsArgsAndPreservesReturn(t *testing.T) {
 	if got != 42 {
 		t.Fatalf("want 42, got %d", got)
 	}
-	if argdump.DebugEnabled {
+	if *argdump.DebugEnabled {
 		_, _ = os.Stderr.WriteString("args:\n" + out + "\n")
 	}
 	if !strings.Contains(out, "arg0=10") ||
@@ -166,7 +166,7 @@ func multiReturnFloat(a int, f float64, s string) (int, float64, string) {
 }
 
 func TestPatchFunc_MultiReturnAndFloat(t *testing.T) {
-	argdump.DebugEnabled = os.Getenv("ARGDUMP_DEBUG") == "1"
+	*argdump.DebugEnabled =os.Getenv("ARGDUMP_DEBUG") == "1"
 	guard, err := argdump.PatchFunc(multiReturnFloat)
 	if err != nil {
 		t.Fatalf("PatchFunc: %v", err)
@@ -203,7 +203,7 @@ type Deep1 struct{ d Deep2 }
 func returnsDeep(x Deep1) Deep1 { return x }
 
 func TestPatchFunc_MaxDepth3(t *testing.T) {
-	argdump.DebugEnabled = os.Getenv("ARGDUMP_DEBUG") == "1"
+	*argdump.DebugEnabled =os.Getenv("ARGDUMP_DEBUG") == "1"
 	guard, err := argdump.PatchFunc(returnsDeep)
 	if err != nil {
 		t.Fatalf("PatchFunc: %v", err)
@@ -233,7 +233,7 @@ func variadicSum(prefix string, nums ...int) int {
 }
 
 func TestPatchFunc_Variadic(t *testing.T) {
-	argdump.DebugEnabled = os.Getenv("ARGDUMP_DEBUG") == "1"
+	*argdump.DebugEnabled =os.Getenv("ARGDUMP_DEBUG") == "1"
 	guard, err := argdump.PatchFunc(variadicSum)
 	if err != nil {
 		t.Fatalf("PatchFunc: %v", err)
@@ -265,7 +265,7 @@ func willPanic(a int, msg string) int {
 }
 
 func TestPatchFunc_PanicPropagatesAndRestores(t *testing.T) {
-	argdump.DebugEnabled = os.Getenv("ARGDUMP_DEBUG") == "1"
+	*argdump.DebugEnabled =os.Getenv("ARGDUMP_DEBUG") == "1"
 	guard, err := argdump.PatchFunc(willPanic)
 	if err != nil {
 		t.Fatalf("PatchFunc: %v", err)
@@ -276,7 +276,7 @@ func TestPatchFunc_PanicPropagatesAndRestores(t *testing.T) {
 	out, rec := captureStdoutRecover(t, func() {
 		_ = willPanic(1, "x")
 	})
-	if argdump.DebugEnabled {
+	if *argdump.DebugEnabled {
 		_, _ = os.Stderr.WriteString("out:\n" + out + "\n")
 	}
 	if rec == nil {
@@ -291,7 +291,7 @@ func TestPatchFunc_PanicPropagatesAndRestores(t *testing.T) {
 		_ = willPanic(1, "y")
 	})
 	println("out2:\n", out2)
-	if argdump.DebugEnabled {
+	if *argdump.DebugEnabled {
 		_, _ = os.Stderr.WriteString("out2:\n" + out2 + "\n")
 	}
 	if !strings.Contains(out2, `arg1="y"`) {
@@ -300,7 +300,7 @@ func TestPatchFunc_PanicPropagatesAndRestores(t *testing.T) {
 }
 
 func TestPatchFunc_Closure(t *testing.T) {
-	argdump.DebugEnabled = os.Getenv("ARGDUMP_DEBUG") == "1"
+	*argdump.DebugEnabled =os.Getenv("ARGDUMP_DEBUG") == "1"
 	base := 5
 	// Captures `base` (closure).
 	clos := func(a int) int { return a + base }
@@ -347,13 +347,13 @@ func Test_Patched_MultiReturn_NoDump(t *testing.T) {
 	// - and then a crash in reflect (e.g. "funcLayout of non-func type") when delegating.
 	//
 	// Keeping the NoDump target in-file makes the entrypoint stable and keeps this test deterministic.
-	prevDebug := argdump.DebugEnabled
-	prevDump := argdump.DumpEnabled
-	argdump.DebugEnabled = os.Getenv("ARGDUMP_DEBUG") == "1"
-	argdump.DumpEnabled = false
+	prevDebug := *argdump.DebugEnabled
+	prevDump := *argdump.DumpEnabled
+	*argdump.DebugEnabled =os.Getenv("ARGDUMP_DEBUG") == "1"
+	*argdump.DumpEnabled =false
 	defer func() {
-		argdump.DebugEnabled = prevDebug
-		argdump.DumpEnabled = prevDump
+		*argdump.DebugEnabled =prevDebug
+		*argdump.DumpEnabled =prevDump
 	}()
 
 	fn := reflect.ValueOf(multiScalarNoDump)
@@ -378,13 +378,13 @@ func Test_Patched_MultiReturn_NoDump(t *testing.T) {
 }
 
 func Test_Patched_MultiReturn_NoDump2(t *testing.T) {
-	prevDebug := argdump.DebugEnabled
-	prevDump := argdump.DumpEnabled
-	argdump.DebugEnabled = os.Getenv("ARGDUMP_DEBUG") == "1"
-	argdump.DumpEnabled = false
+	prevDebug := *argdump.DebugEnabled
+	prevDump := *argdump.DumpEnabled
+	*argdump.DebugEnabled =os.Getenv("ARGDUMP_DEBUG") == "1"
+	*argdump.DumpEnabled =false
 	defer func() {
-		argdump.DebugEnabled = prevDebug
-		argdump.DumpEnabled = prevDump
+		*argdump.DebugEnabled =prevDebug
+		*argdump.DumpEnabled =prevDump
 	}()
 
 	fn := reflect.ValueOf(multiScalar1)
@@ -409,13 +409,13 @@ func Test_Patched_MultiReturn_NoDump2(t *testing.T) {
 }
 
 func Test_Patched_CrossPackage_NoDump(t *testing.T) {
-	prevDebug := argdump.DebugEnabled
-	prevDump := argdump.DumpEnabled
-	argdump.DebugEnabled = os.Getenv("ARGDUMP_DEBUG") == "1"
-	argdump.DumpEnabled = false
+	prevDebug := *argdump.DebugEnabled
+	prevDump := *argdump.DumpEnabled
+	*argdump.DebugEnabled =os.Getenv("ARGDUMP_DEBUG") == "1"
+	*argdump.DumpEnabled =false
 	defer func() {
-		argdump.DebugEnabled = prevDebug
-		argdump.DumpEnabled = prevDump
+		*argdump.DebugEnabled =prevDebug
+		*argdump.DumpEnabled =prevDump
 	}()
 
 	// Warm the symbol so the call site is present.
