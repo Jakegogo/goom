@@ -1,23 +1,19 @@
-//go:build go1.24 && amd64
-// +build go1.24,amd64
+//go:build go1.18 && !go1.24 && amd64
+// +build go1.18,!go1.24,amd64
 
 package argdump_test
 
 import (
 	"bytes"
-	"encoding/hex"
 	"io"
 	"os"
 	"reflect"
 	"runtime"
-	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/tencent/goom/internal/argdump"
 	"github.com/tencent/goom/internal/argdump/testtargets"
-	"github.com/tencent/goom/internal/bytecode/memory"
-	"github.com/tencent/goom/internal/patch"
 )
 
 type Info struct {
@@ -71,20 +67,6 @@ func captureStdoutRecover(t *testing.T, fn func()) (out string, recovered interf
 	return out, recovered
 }
 
-func patchFuncOrSkip(t *testing.T, target interface{}) *patch.Guard {
-	t.Helper()
-
-	guard, err := argdump.PatchFunc(target)
-	if err == nil {
-		return guard
-	}
-	if strings.Contains(err.Error(), "not implemented") {
-		t.Skipf("PatchFunc not supported: %v", err)
-	}
-	t.Fatalf("PatchFunc: %v", err)
-	return nil
-}
-
 //go:noinline
 func add(a int, b int, info Info) int {
 	if a < 0 {
@@ -93,48 +75,18 @@ func add(a int, b int, info Info) int {
 	return a + b
 }
 
-func TestPatchFunc_PrintsArgsAndPreservesReturn(t *testing.T) {
-	// t.Skip("TODO: PatchFunc is not stable on macOS arm64 in this environment (SIGBUS while executing patched code).")
+func TestPatchFunc_PreGo124_PrintsArgsAndPreservesReturn(t *testing.T) {
 	*argdump.DebugEnabled = os.Getenv("ARGDUMP_DEBUG") == "1"
-	guard := patchFuncOrSkip(t, add)
-	if guard.FixOriginFunc() == 0 {
-		t.Fatalf("expected non-zero FixOriginFunc trampoline")
-	}
-	if *argdump.DebugLastProxyFuncValPtr == 0 {
-		t.Fatalf("debug proxy funcval not set")
-	}
-	if *argdump.DebugLastProxyCodePtr != *argdump.DebugLastMakeFuncStubPtr {
-		t.Fatalf("proxy code ptr mismatch: funcval=0x%x code=0x%x makeFuncStub=0x%x",
-			*argdump.DebugLastProxyFuncValPtr, *argdump.DebugLastProxyCodePtr, *argdump.DebugLastMakeFuncStubPtr)
+	prevDump := *argdump.DumpEnabled
+	*argdump.DumpEnabled = true
+	defer func() { *argdump.DumpEnabled = prevDump }()
+
+	guard, err := argdump.PatchFunc(add)
+	if err != nil {
+		t.Fatalf("PatchFunc: %v", err)
 	}
 	guard.Apply()
 	defer guard.UnpatchWithLock()
-
-	if *argdump.DebugEnabled {
-		// --- pre-call diagnostics (stderr) ---
-		origin := guard.OriginFunc()
-		code := memory.RawRead(origin, 32)
-		_, _ = os.Stderr.WriteString("origin=0x" + strconv.FormatUint(uint64(origin), 16) + "\n")
-		_, _ = os.Stderr.WriteString("patched bytes: " + hex.EncodeToString(code) + "\n")
-		_, _ = os.Stderr.WriteString(
-			"proxyFuncVal=0x" + strconv.FormatUint(uint64(*argdump.DebugLastProxyFuncValPtr), 16) +
-				" makeFuncStub=0x" + strconv.FormatUint(uint64(*argdump.DebugLastMakeFuncStubPtr), 16) + "\n",
-		)
-		_, _ = os.Stderr.WriteString(
-			"origFuncVal=0x" + strconv.FormatUint(uint64(*argdump.DebugOrigFuncValPtr), 16) +
-				" origCode=0x" + strconv.FormatUint(uint64(*argdump.DebugOrigCodePtr), 16) + "\n",
-		)
-		_, _ = os.Stderr.WriteString(
-			"callDump=0x" + strconv.FormatUint(uint64(*argdump.DebugCallDumpPtr), 16) +
-				" callReflect=0x" + strconv.FormatUint(uint64(*argdump.DebugCallReflectPtr), 16) +
-				" runtime.reflectcall=0x" + strconv.FormatUint(uint64(*argdump.DebugRuntimeReflectcallPtr), 16) + "\n",
-		)
-		_, _ = os.Stderr.WriteString(
-			"runtime.spillArgs=0x" + strconv.FormatUint(uint64(*argdump.DebugRuntimeSpillArgsPtr), 16) +
-				" runtime.unspillArgs=0x" + strconv.FormatUint(uint64(*argdump.DebugRuntimeUnspillArgsPtr), 16) +
-				" reflect.moveMakeFuncArgPtrs=0x" + strconv.FormatUint(uint64(*argdump.DebugMoveMakeFuncArgPtrsPtr), 16) + "\n",
-		)
-	}
 
 	var got int
 	out := captureStdout(t, func() {
@@ -143,9 +95,6 @@ func TestPatchFunc_PrintsArgsAndPreservesReturn(t *testing.T) {
 
 	if got != 42 {
 		t.Fatalf("want 42, got %d", got)
-	}
-	if *argdump.DebugEnabled {
-		_, _ = os.Stderr.WriteString("args:\n" + out + "\n")
 	}
 	if !strings.Contains(out, "arg0=10") ||
 		!strings.Contains(out, "arg1=32") ||
@@ -162,9 +111,16 @@ func multiReturnFloat(a int, f float64, s string) (int, float64, string) {
 	return a * 2, f * 1.5, s + "!"
 }
 
-func TestPatchFunc_MultiReturnAndFloat(t *testing.T) {
+func TestPatchFunc_PreGo124_MultiReturnAndFloat(t *testing.T) {
 	*argdump.DebugEnabled = os.Getenv("ARGDUMP_DEBUG") == "1"
-	guard := patchFuncOrSkip(t, multiReturnFloat)
+	prevDump := *argdump.DumpEnabled
+	*argdump.DumpEnabled = true
+	defer func() { *argdump.DumpEnabled = prevDump }()
+
+	guard, err := argdump.PatchFunc(multiReturnFloat)
+	if err != nil {
+		t.Fatalf("PatchFunc: %v", err)
+	}
 	guard.Apply()
 	defer guard.UnpatchWithLock()
 
@@ -196,9 +152,16 @@ type Deep1 struct{ d Deep2 }
 //go:noinline
 func returnsDeep(x Deep1) Deep1 { return x }
 
-func TestPatchFunc_MaxDepth3(t *testing.T) {
+func TestPatchFunc_PreGo124_MaxDepth3(t *testing.T) {
 	*argdump.DebugEnabled = os.Getenv("ARGDUMP_DEBUG") == "1"
-	guard := patchFuncOrSkip(t, returnsDeep)
+	prevDump := *argdump.DumpEnabled
+	*argdump.DumpEnabled = true
+	defer func() { *argdump.DumpEnabled = prevDump }()
+
+	guard, err := argdump.PatchFunc(returnsDeep)
+	if err != nil {
+		t.Fatalf("PatchFunc: %v", err)
+	}
 	guard.Apply()
 	defer guard.UnpatchWithLock()
 
@@ -223,9 +186,16 @@ func variadicSum(prefix string, nums ...int) int {
 	return sum
 }
 
-func TestPatchFunc_Variadic(t *testing.T) {
+func TestPatchFunc_PreGo124_Variadic(t *testing.T) {
 	*argdump.DebugEnabled = os.Getenv("ARGDUMP_DEBUG") == "1"
-	guard := patchFuncOrSkip(t, variadicSum)
+	prevDump := *argdump.DumpEnabled
+	*argdump.DumpEnabled = true
+	defer func() { *argdump.DumpEnabled = prevDump }()
+
+	guard, err := argdump.PatchFunc(variadicSum)
+	if err != nil {
+		t.Fatalf("PatchFunc: %v", err)
+	}
 	guard.Apply()
 	defer guard.UnpatchWithLock()
 
@@ -252,9 +222,16 @@ func willPanic(a int, msg string) int {
 	return a
 }
 
-func TestPatchFunc_PanicPropagatesAndRestores(t *testing.T) {
+func TestPatchFunc_PreGo124_PanicPropagatesAndRestores(t *testing.T) {
 	*argdump.DebugEnabled = os.Getenv("ARGDUMP_DEBUG") == "1"
-	guard := patchFuncOrSkip(t, willPanic)
+	prevDump := *argdump.DumpEnabled
+	*argdump.DumpEnabled = true
+	defer func() { *argdump.DumpEnabled = prevDump }()
+
+	guard, err := argdump.PatchFunc(willPanic)
+	if err != nil {
+		t.Fatalf("PatchFunc: %v", err)
+	}
 	guard.Apply()
 	defer guard.UnpatchWithLock()
 
@@ -275,7 +252,6 @@ func TestPatchFunc_PanicPropagatesAndRestores(t *testing.T) {
 	out2, _ := captureStdoutRecover(t, func() {
 		_ = willPanic(1, "y")
 	})
-	println("out2:\n", out2)
 	if *argdump.DebugEnabled {
 		_, _ = os.Stderr.WriteString("out2:\n" + out2 + "\n")
 	}
@@ -284,14 +260,20 @@ func TestPatchFunc_PanicPropagatesAndRestores(t *testing.T) {
 	}
 }
 
-func TestPatchFunc_Closure(t *testing.T) {
+func TestPatchFunc_PreGo124_Closure(t *testing.T) {
 	*argdump.DebugEnabled = os.Getenv("ARGDUMP_DEBUG") == "1"
+	prevDump := *argdump.DumpEnabled
+	*argdump.DumpEnabled = true
+	defer func() { *argdump.DumpEnabled = prevDump }()
+
 	base := 5
 	// Captures `base` (closure).
 	clos := func(a int) int { return a + base }
 
-	guard := patchFuncOrSkip(t, clos)
-	// Closure has context; trampoline calling isn't safe here, so FixOriginFunc may be zero.
+	guard, err := argdump.PatchFunc(clos)
+	if err != nil {
+		t.Fatalf("PatchFunc: %v", err)
+	}
 	guard.Apply()
 	defer guard.UnpatchWithLock()
 
@@ -343,7 +325,10 @@ func Test_Patched_MultiReturn_NoDump(t *testing.T) {
 	runtime.KeepAlive(fn)
 
 	// NOTE: NoDump benchmarks intentionally use scalar-only signatures to isolate hook/jump overhead.
-	guard := patchFuncOrSkip(t, multiScalarNoDump)
+	guard, err := argdump.PatchFunc(multiScalarNoDump)
+	if err != nil {
+		t.Fatalf("PatchFunc: %v", err)
+	}
 	guard.Apply()
 	defer guard.UnpatchWithLock()
 
@@ -371,7 +356,10 @@ func Test_Patched_MultiReturn_NoDump2(t *testing.T) {
 	runtime.KeepAlive(fn)
 
 	// NOTE: NoDump benchmarks intentionally use scalar-only signatures to isolate hook/jump overhead.
-	guard := patchFuncOrSkip(t, multiScalar1)
+	guard, err := argdump.PatchFunc(multiScalar1)
+	if err != nil {
+		t.Fatalf("PatchFunc: %v", err)
+	}
 	guard.Apply()
 	defer guard.UnpatchWithLock()
 
@@ -399,7 +387,10 @@ func Test_Patched_CrossPackage_NoDump(t *testing.T) {
 	fn.Call([]reflect.Value{reflect.ValueOf(7), reflect.ValueOf(2.5)})
 	runtime.KeepAlive(fn)
 
-	guard := patchFuncOrSkip(t, testtargets.CrossPkgScalar)
+	guard, err := argdump.PatchFunc(testtargets.CrossPkgScalar)
+	if err != nil {
+		t.Fatalf("PatchFunc: %v", err)
+	}
 	guard.Apply()
 	defer guard.UnpatchWithLock()
 

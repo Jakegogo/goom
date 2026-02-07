@@ -1,5 +1,5 @@
-//go:build go1.24 && amd64 && windows
-// +build go1.24,amd64,windows
+//go:build go1.24 && amd64
+// +build go1.24,amd64
 
 package testtargets
 

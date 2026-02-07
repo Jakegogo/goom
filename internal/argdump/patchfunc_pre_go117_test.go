@@ -4,6 +4,7 @@
 package argdump_test
 
 import (
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -16,12 +17,7 @@ func preGo117Add(a int, b int) int { return a + b }
 
 func TestUnitPatchFunc_PreGo117_PrintsArgsAndPreservesReturn(t *testing.T) {
 	// PatchFunc modifies executable code; keep it opt-in for CI stability.
-	// Enable via: ARGDUMP_ENABLE_PATCH_TEST=1
-	if os.Getenv("ARGDUMP_ENABLE_PATCH_TEST") != "1" {
-		t.Skip("set ARGDUMP_ENABLE_PATCH_TEST=1 to run PatchFunc tests")
-	}
-
-	*argdump.DebugEnabled =os.Getenv("ARGDUMP_DEBUG") == "1"
+	*argdump.DebugEnabled = os.Getenv("ARGDUMP_DEBUG") == "1"
 
 	guard, err := argdump.PatchFunc(preGo117Add)
 	if err != nil {
@@ -37,6 +33,7 @@ func TestUnitPatchFunc_PreGo117_PrintsArgsAndPreservesReturn(t *testing.T) {
 		}
 	})
 
+	fmt.Println(out)
 	if !strings.Contains(out, "arg0=") || !strings.Contains(out, "arg1=") {
 		t.Fatalf("unexpected stdout:\n%s", out)
 	}
