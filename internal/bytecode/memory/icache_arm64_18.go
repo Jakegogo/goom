@@ -19,8 +19,8 @@ var (
 	// clearICacheIns 清除指令缓存指令
 	// 新版mac使用 AARCH64 (arm64v8), 指令缓存命中率较高, 会出现patch成功但是使用缓存中原来的指令来执行，导致 mock 失败
 	clearICacheIns = []byte{
-		//0x60, 0x00, 0xa0, 0xd2,//# 	mov 	x1,  [size] // 8个指令 $ 1-4
-		//0xE0, 0x07, 0x40, 0xF9, // # 	ldr   	x0, [sp, #8] $ 5
+		// 0x60, 0x00, 0xa0, 0xd2,//# 	mov 	x1,  [size] // 8个指令 $ 1-4
+		// 0xE0, 0x07, 0x40, 0xF9, // # 	ldr   	x0, [sp, #8] $ 5
 		0x09, 0xe4, 0x7a, 0x92, // # 	and		x9, x0, #~((1<<6)-1) $ 6 cacheline align address
 		0x0a, 0x14, 0x40, 0x92, // # 	and		x10, x0, #((1<<6)-1) $ 7 extend length by alignment
 		0x2a, 0x00, 0x0a, 0x8b, // # 	add		x10, x1, x10 $ 8

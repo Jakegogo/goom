@@ -106,7 +106,7 @@ func (p *patch) unsafePatchPtr() error {
 	if p.trampoline != nil {
 		trampolinePtr, err := bytecode.GetTrampolinePtr(p.trampoline)
 		if err != nil {
-			return err
+			return fmt.Errorf("patch error when get ptr of trampoline: %w", err)
 		}
 		p.trampolinePtr = trampolinePtr
 	}

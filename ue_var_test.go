@@ -14,13 +14,6 @@ import (
 
 // TestUnitUeVarTestSuite 测试入口
 func TestUnitUeVarTestSuite(t *testing.T) {
-	if os.Getenv("GOOM_ENABLE_UNEXPORTED_VAR_TEST") != "1" {
-		// Stability note (darwin/arm64):
-		// UnExportedVar mock relies on locating DATA/BSS symbols in the test binary's symbol table.
-		// Some toolchains/build modes omit or rename data symbols, making FindVarByName fail.
-		// Keep this opt-in so `go test ./...` stays deterministic.
-		t.Skip("set GOOM_ENABLE_UNEXPORTED_VAR_TEST=1 to run unexported var mock tests (requires var symbols in the test binary)")
-	}
 	// 开启 debug
 	// 1.可以查看 apply 和 reset 的状态日志
 	// 2.查看 mock 调用日志
@@ -46,10 +39,10 @@ func (s *ueVarMockerTestSuite) TestNewUeVarMock() {
 		mocker := mocker.Create().UnExportedVar("github.com/tencent/goom/test.unexportedGlobalIntVar")
 		s.Equal(1, test.UnexportedGlobalIntVar(), "unexported global int var result check")
 		mocker.Set(3)
-		//fmt.Println(test.UnexportedGlobalIntVar())
+		// fmt.Println(test.UnexportedGlobalIntVar())
 		s.Equal(3, test.UnexportedGlobalIntVar(), "unexported global int var result check")
 		mocker.Cancel()
-		//fmt.Println(test.UnexportedGlobalIntVar())
+		// fmt.Println(test.UnexportedGlobalIntVar())
 		s.Equal(1, test.UnexportedGlobalIntVar(), "unexported global int var result check")
 	})
 }

@@ -17,7 +17,7 @@ const arm64InsnLen = 4
 // trampoline 需要移动到的目标地址
 // funcSize 函数字节码整体长度
 // leastSize 要替换的字节长度的最小限制
-func fixRelativeAddr(from uintptr, copyOrigin []byte, trampoline uintptr, funcSize int, leastSize int) (
+func fixRelativeAddr(from uintptr, copyOrigin []byte, trampoline uintptr, funcSize, leastSize int) (
 	fixedData []byte, fixedDataSize int, err error) {
 	// try to replace and get the len(endPos) to replace
 	_, fixedDataSize, err = fixBlockArm64(from, copyOrigin, trampoline, leastSize, funcSize)

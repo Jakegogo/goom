@@ -78,7 +78,7 @@ func ptrOfBytes(data []byte) uintptr {
 	return uintptr(unsafe.Pointer(&data[0]))
 }
 
-func traceMprotectHeader(page uintptr, pageSize uintptr, addr uintptr, length int) {
+func traceMprotectHeader(page, pageSize, addr uintptr, length int) {
 	targetFn := runtime.FuncForPC(addr)
 	targetName := "<unknown>"
 	if targetFn != nil {
@@ -96,7 +96,7 @@ func traceMprotectHeader(page uintptr, pageSize uintptr, addr uintptr, length in
 	_ = pageSize
 }
 
-func traceAllStacks(page uintptr, addr uintptr, length int) {
+func traceAllStacks(page, addr uintptr, length int) {
 	buf := make([]byte, 1<<20)
 	n := runtime.Stack(buf, true)
 	if n == 0 {

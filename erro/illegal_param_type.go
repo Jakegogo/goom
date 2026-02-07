@@ -19,6 +19,6 @@ func (i *IllegalParamType) Error() string {
 // paramName 参数名
 // paramType 参数类型
 // expectType 期望类型
-func NewIllegalParamTypeError(paramName string, paramType, expectType string) error {
+func NewIllegalParamTypeError(paramName, paramType, expectType string) error {
 	return &IllegalParamType{paramName: paramName, paramType: paramType, expectType: expectType}
 }

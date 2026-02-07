@@ -67,4 +67,3 @@ func Write(s *Space, data []byte) error {
 		return fmt.Errorf("stub write fail, illegal type: %d", s.typ)
 	}
 }
-

@@ -84,7 +84,7 @@ func IsValidPtr(value interface{}) bool {
 }
 
 // PrintInst PrintInst 调试内存指令替换,对原指令、替换之后的指令进行输出对比
-func PrintInst(name string, from uintptr, size int, level int) {
+func PrintInst(name string, from uintptr, size, level int) {
 	if logger.LogLevel < level {
 		return
 	}

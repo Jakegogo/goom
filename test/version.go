@@ -58,9 +58,9 @@ func Run(version string, logHandler func(log string), args ...string) error {
 func runGo(root string, logHandler func(log string), args []string) error {
 	gobin := filepath.Join(root, "bin", "go"+exe())
 	cmd := exec.Command(gobin, args...)
-	//cmd.Stdin = os.Stdin
-	//cmd.Stdout = os.Stdout
-	//cmd.Stderr = os.Stderr
+	// cmd.Stdin = os.Stdin
+	// cmd.Stdout = os.Stdout
+	// cmd.Stderr = os.Stderr
 	newPath := filepath.Join(root, "bin")
 	if p := os.Getenv("PATH"); p != "" {
 		newPath += string(filepath.ListSeparator) + p

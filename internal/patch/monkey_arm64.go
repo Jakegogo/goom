@@ -15,7 +15,7 @@ const (
 // nopOpcode 空指令插入到原函数开头第一个字节, 用于判断原函数是否已经被Patch过
 var nopOpcode = []byte{0xD5, 0x03, 0x20, 0x1F}
 
-func jmpToFunctionValue(from, to uintptr, replacementCode uintptr) []byte {
+func jmpToFunctionValue(from, to, replacementCode uintptr) []byte {
 	_ = from
 	// WHY (darwin arm64e / PAC):
 	// - On arm64e, funcval.fn may carry a PAC-signed pointer. A plain BR xN does NOT

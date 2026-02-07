@@ -17,7 +17,7 @@ import (
 // @param funcDef 原始函数定义
 // @param proxyFunc 代理函数实现
 // @param originFunc 跳板函数即代理后的原始函数定义(值为 nil 时,使用公共的跳板函数, 不为 nil 时使用指定的跳板函数)
-func Func(funcDef interface{}, proxyFunc, trampolineFunc interface{}) (*patch.Guard, error) {
+func Func(funcDef, proxyFunc, trampolineFunc interface{}) (*patch.Guard, error) {
 	if e := checkTrampolineFunc(trampolineFunc); e != nil {
 		return nil, e
 	}
@@ -50,7 +50,7 @@ func Func(funcDef interface{}, proxyFunc, trampolineFunc interface{}) (*patch.Gu
 // @param genCallableMethod 函数名称
 // @param proxyFunc 代理函数实现
 // @param trampolineFunc 跳板函数,即代理后的原始函数定义;跳板函数的签名必须和原函数一致,值不能为空
-func FuncName(funcName string, proxyFunc interface{}, trampolineFunc interface{}) (*patch.Guard, error) {
+func FuncName(funcName string, proxyFunc, trampolineFunc interface{}) (*patch.Guard, error) {
 	if e := checkTrampolineFunc(trampolineFunc); e != nil {
 		return nil, e
 	}

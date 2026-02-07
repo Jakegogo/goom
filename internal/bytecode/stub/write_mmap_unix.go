@@ -27,4 +27,3 @@ func writeToMMap(addr uintptr, space *[]byte, data []byte) error {
 	memory.ClearICache(addr)
 	return nil
 }
-

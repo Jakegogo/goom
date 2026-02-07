@@ -83,7 +83,7 @@ func EncodeAddress(ops []byte, addr []byte, addrLen int, val int, add int) []byt
 	}
 }
 
-func toInst(ops []byte, addr []byte) []byte {
+func toInst(ops, addr []byte) []byte {
 	result := make([]byte, 0)
 	result = append(result, ops...)
 	return append(result, addr...)

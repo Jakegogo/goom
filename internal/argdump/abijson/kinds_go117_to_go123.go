@@ -6,5 +6,3 @@ package abijson
 import "reflect"
 
 const kindPointer = reflect.Ptr
-
-

@@ -138,7 +138,7 @@ func TestGenImpl(t *testing.T) {
 }
 
 // genInterfaceImpl 生成接口实现
-func genInterfaceImpl(i interface{}, proxy interface{}) {
+func genInterfaceImpl(i, proxy interface{}) {
 	gen := hack.UnpackEFace(i).Data
 	// mock 接口方法
 	mockFunc := reflect.ValueOf(proxy)

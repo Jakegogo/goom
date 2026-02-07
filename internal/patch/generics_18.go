@@ -15,7 +15,7 @@ var (
 )
 
 func init() {
-	//解析正则表达式，如果成功返回解释器
+	// 解析正则表达式，如果成功返回解释器
 	if nameReg == nil {
 		fmt.Println("regexp err")
 		return

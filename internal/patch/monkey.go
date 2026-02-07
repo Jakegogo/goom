@@ -18,7 +18,7 @@ func Patch(origin, replacement interface{}) (*Guard, error) {
 // origin 原始函数
 // replacement 代理函数
 // trampoline 指定跳板函数(可不指定,传 nil)
-func Trampoline(origin, replacement interface{}, trampoline interface{}) (*Guard, error) {
+func Trampoline(origin, replacement, trampoline interface{}) (*Guard, error) {
 	patch := &patch{
 		origin:      origin,
 		replacement: replacement,
@@ -44,7 +44,7 @@ func UnsafePatch(origin, replacement interface{}) (*Guard, error) {
 // origin 原始函数
 // replacement 代理函数
 // trampoline 指定跳板函数(可不指定,传 nil)
-func UnsafePatchTrampoline(origin, replacement interface{}, trampoline interface{}) (*Guard, error) {
+func UnsafePatchTrampoline(origin, replacement, trampoline interface{}) (*Guard, error) {
 	patch := &patch{
 		origin:           origin,
 		replacement:      replacement,

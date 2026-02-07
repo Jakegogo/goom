@@ -6,7 +6,7 @@ import (
 )
 
 // SignatureEquals 检测两个函数类型的参数的内存区段是否一致
-func SignatureEquals(typeA reflect.Type, typeB reflect.Type) bool {
+func SignatureEquals(typeA, typeB reflect.Type) bool {
 	// 检测参数对齐
 	if typeA.NumIn() != typeB.NumIn() {
 		panic(fmt.Sprintf("func signature mismatch, args len must:%d, actual:%d",

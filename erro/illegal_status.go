@@ -14,6 +14,6 @@ func (i *IllegalStatus) Error() string {
 // NewIllegalStatusError 状态参数异常
 // funcName 函数名
 // msg 信息
-func NewIllegalStatusError(funcName string, msg string) error {
+func NewIllegalStatusError(funcName, msg string) error {
 	return &IllegalStatus{funcName: funcName, msg: msg}
 }

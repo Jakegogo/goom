@@ -68,7 +68,7 @@ func PtrCodeWithCtx(originPtr uintptr, ctxtPtr uintptr, codePtr uintptr, fixOrig
 // function body without unpatching the origin.
 //
 // The trampoline contains relocated origin prologue instructions and then jumps back to origin+N.
-func PtrCodeWithCtxTrampoline(originPtr uintptr, ctxtPtr uintptr, codePtr uintptr) (*Guard, error) {
+func PtrCodeWithCtxTrampoline(originPtr, ctxtPtr, codePtr uintptr) (*Guard, error) {
 	lock()
 	defer unlock()
 
@@ -112,7 +112,7 @@ func emitMovX26Imm64(dst []byte, ptr uintptr) []byte {
 // - jump to codePtr using:
 //   - short B imm26 when in range (smaller/faster)
 //   - otherwise load absolute addr into x16 and BR x16 (stable, no deref)
-func jmpToCodeWithCtxJump(originPtr uintptr, ctxtPtr uintptr, codePtr uintptr) ([]byte, error) {
+func jmpToCodeWithCtxJump(originPtr, ctxtPtr, codePtr uintptr) ([]byte, error) {
 	// 16 bytes: MOVZ/MOVK x26, ctxtPtr
 	res := make([]byte, 0, 40)
 	res = emitMovX26Imm64(res, ctxtPtr)

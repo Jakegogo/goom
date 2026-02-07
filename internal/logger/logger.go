@@ -313,24 +313,23 @@ func loggerPath() (string, error) {
 	if err == nil {
 		dir = homeDir
 	}
-	if err == nil && "/" != dir {
+	if err == nil && dir != "/" {
 		logFileLocation = filepath.Join(dir, "logs")
 	}
 
 	// 判断文件夹是否存在
 	_, err = os.Stat(logFileLocation)
-	if err != nil {
-		if os.IsNotExist(err) {
-			err = os.Mkdir(logFileLocation, os.ModePerm)
-			if err != nil {
-				fmt.Println("init log file error:", err)
-				return ".", err
-			}
-		} else {
+	if err == nil {
+		return logFileLocation, err
+	}
+	if os.IsNotExist(err) {
+		err = os.Mkdir(logFileLocation, os.ModePerm)
+		if err != nil {
+			fmt.Println("init log file error:", err)
 			return ".", err
 		}
 	}
-	return logFileLocation, err
+	return ".", err
 }
 
 // CallerFn 获取 Caller 行号的回调函数类型

@@ -20,7 +20,7 @@ import (
 func TestMakeDumpFunc_PrintsArgsAndReturnsZero(t *testing.T) {
 	type Fn func(a int, b *int, c string, d float32) (int, *int)
 
-	typ := reflect.TypeOf((Fn)(nil))
+	typ := reflect.TypeOf(Fn(nil))
 	fAny := argdump.MakeDumpFunc(typ)
 	f, ok := fAny.(Fn)
 	if !ok {
@@ -71,7 +71,8 @@ func TestMakeDumpFunc_PrintsArgsAndReturnsZero(t *testing.T) {
 		_, _ = os.Stderr.WriteString("dump:\n" + out + "\n")
 	}
 	print(out)
-	if !strings.Contains(out, "arg0=") || !strings.Contains(out, "arg1=") || !strings.Contains(out, "arg2=") || !strings.Contains(out, "arg3=") {
+	if !strings.Contains(out, "arg0=") || !strings.Contains(out, "arg1=") ||
+		!strings.Contains(out, "arg2=") || !strings.Contains(out, "arg3=") {
 		t.Fatalf("unexpected stdout:\n%s", out)
 	}
 }

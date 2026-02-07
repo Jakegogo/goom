@@ -90,7 +90,7 @@ type DefaultMatcher struct {
 }
 
 // newDefaultMatch 创建新参数匹配
-func newDefaultMatch(args []interface{}, results []interface{}, isMethod bool, funTyp reflect.Type) *DefaultMatcher {
+func newDefaultMatch(args, results []interface{}, isMethod bool, funTyp reflect.Type) *DefaultMatcher {
 	argsTypes, isVariadic := inTypes(isMethod, funTyp)
 	if isVariadic {
 		expandType := funTyp.In(funTyp.NumIn() - 1).Elem()

@@ -36,7 +36,7 @@ func NewIllegalParamError(paramName string, paramValue string) error {
 // NewIllegalParamCError 创建参数异常
 // paramName 参数名
 // paramValue 参数值
-func NewIllegalParamCError(paramName string, paramValue string, cause error) error {
+func NewIllegalParamCError(paramName, paramValue string, cause error) error {
 	return &IllegalParam{paramName: paramName, paramValue: paramValue, cause: cause}
 }
 
@@ -44,6 +44,6 @@ func NewIllegalParamCError(paramName string, paramValue string, cause error) err
 // funcName 函数名
 // paramName 参数名
 // paramValue 参数值
-func NewIllegalCallError(funcName string, paramName string, paramValue string) error {
+func NewIllegalCallError(funcName, paramName string, paramValue string) error {
 	return &IllegalParam{funcName: funcName, paramName: paramName, paramValue: paramValue}
 }

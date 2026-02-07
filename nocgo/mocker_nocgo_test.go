@@ -15,7 +15,7 @@ import (
 func foo(i int) int {
 	// check 对 defer 的支持
 	defer func() { fmt.Printf("defer\n") }()
-	//cgoFuncAny()
+	// cgoFuncAny()
 	return i * 1
 }
 

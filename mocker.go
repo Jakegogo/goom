@@ -87,7 +87,7 @@ func (m *baseMocker) applyByName(funcName string, callback interface{}) {
 }
 
 // applyByFunc 根据函数应用 mock
-func (m *baseMocker) applyByFunc(funcDef interface{}, callback interface{}) {
+func (m *baseMocker) applyByFunc(funcDef, callback interface{}) {
 	guard, err := proxy.Func(funcDef, callback, m.origin)
 	if err != nil {
 		panic(fmt.Sprintf("proxy func definition error: %v", err))
@@ -343,7 +343,7 @@ type UnexportedMethodMocker struct {
 // NewUnexportedMethodMocker 创建未导出方法 Mocker
 // pkgName 包路径
 // structName 结构体名称
-func NewUnexportedMethodMocker(pkgName string, structName string) *UnexportedMethodMocker {
+func NewUnexportedMethodMocker(pkgName, structName string) *UnexportedMethodMocker {
 	return &UnexportedMethodMocker{
 		baseMocker: newBaseMocker(pkgName),
 		structName: structName,

@@ -1,89 +1,149 @@
-# 完整版本在 https://golangci-lint.run/usage/configuration/
-linters-settings:
-  funlen:
-    lines: 80
-    statements: 80
-  goconst:
-    min-len: 2
-    min-occurrences: 2
-  gocyclo:
-    min-complexity: 20
-  goimports:
-  #local-prefixes: github.com/tencent/goom
-  golint:
-  #min-confidence: 0
-  govet:
-    check-shadowing: true
-  lll:
-    line-length: 120
-  errcheck:
-    check-type-assertions: true
-  gocritic:
-    enabled-checks:
-      - nestingReduce
-    settings:
-      nestingReduce:
-        bodyWidth: 5
-
-linters:
-  disable-all: true
-  enable:
-    - deadcode
-    - funlen
-    - goconst
-    - gocyclo
-    - gofmt
-    - ineffassign
-    - staticcheck
-    - structcheck # 当非导出结构嵌入另一个结构, 前一个结构被使用就不会监测到, 这个需要每个业务自己屏蔽
-    - typecheck
-    - goimports
-    - golint
-    - gosimple
-    - govet
-    - lll
-    - rowserrcheck
-    - errcheck
-    - unused
-    - varcheck
-    # - bodyclose https://github.com/timakin/bodyclose/issues 问题太多了，屏蔽都屏蔽不过来，显式不使用它
+version: "2"
 
 run:
-  timeout: 20m
-
-issues:
-  exclude-use-default: true
-
-  # The list of ids of default excludes to include or disable. By default it's empty.
-  # 下面的规则，golangci-lint认为应该屏蔽，但是我们选择不屏蔽。所以，`exclude-use-default: true`屏蔽一部分，把下面的再捞出来。
-  # golanglint-ci维护的忽略列表里有一些是我们不想屏蔽的，捞出来。这里说一下，使用白名单是好于黑名单的。名单随着golanglint-ci引入更多工具，我们跟进享受好处。我们搞黑名单，就变成自己维护，不如golanglint-ci去维护，更好。
-  include:
-    - EXC0002 # golint (comment on exported (method|function|type|const)|should have( a package)? comment|comment should be of the form)
-    - EXC0003 # golint func name will be used as test\.Test.* by other packages, and that stutters; consider calling this
-    - EXC0004 # govet (possible misuse of unsafe.Pointer|should have signature)
-    - EXC0005 # staticcheck ineffective break statement. Did you mean to break out of the outer loop
-    - EXC0011 # stylecheck (comment on exported (method|function|type|const)|should have( a package)? comment|comment should be of the form)
-
-  exclude-rules:
-    - linters:
-        - staticcheck
-      text: "SA1019: package github.com/golang/protobuf" # 它会说 'SA1019: package github.com/golang/protobuf/proto is deprecated: Use the "google.golang.org/protobuf/proto" package instead.', 但是这个库更更新很稳定
-    - linters:
-        - staticcheck
-      text: "SA6002: argument should be pointer-like to avoid allocations" # sync.pool.Put(buf), slice `var buf []byte` will tiger this
-    - linters:
-        - structcheck
-      text: "Store` is unused" # 文档项目独有的, 当非导出结构嵌入另一个结构, 前一个结构被使用就不会监测到
-    - linters:
-        - lll
-      source: "^//go:generate " # Exclude lll issues for long lines with go:generate
-
-  max-same-issues: 0
-  new: false
-  max-issues-per-linter: 0
+  timeout: 5m
+  tests: true
+  issues-exit-code: 1
 
 output:
+  print-issued-lines: true
   sort-results: true
 
-service:
-  golangci-lint-version: 1.23.x
+linters:
+  # v2 用 default 控制“基础启用集”；等价于 v1 的 disable-all: true
+  default: none
+
+  enable:
+    # --- E 可维护性 / 结构 / 重复 / 复杂度（最高优先级） ---
+    - govet
+    - staticcheck
+    - gocritic
+    - revive
+    - ineffassign
+    - unused
+    - unconvert
+    - prealloc
+    - nilerr
+    - errname
+    - dupl
+    - gocyclo
+    - cyclop
+    - funlen
+    - lll
+    - misspell
+    - nakedret
+
+    # --- 错误处理一致性（wrap / 日志 / 重试 / 幂等） ---
+    - errcheck
+    - errorlint
+    - wrapcheck
+
+    # --- 安全（输入校验 / 注入 / 常见漏洞） ---
+    - gosec
+    - bodyclose
+
+    # --- 并发 / 竞态 / 泄露 ---
+    - unparam
+    - forbidigo
+    - copyloopvar
+
+  settings:
+    govet:
+      enable-all: true
+      disable:
+        - fieldalignment
+
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - performance
+        - style
+      disabled-checks:
+        - whyNoLint
+
+    revive:
+      rules:
+        - name: var-naming
+        - name: package-comments
+          disabled: true
+        - name: exported
+          disabled: true
+        - name: blank-imports
+        - name: unnecessary-stmt
+        - name: superfluous-else
+        - name: early-return
+        - name: indent-error-flow
+
+    dupl:
+      threshold: 120
+
+    gocyclo:
+      min-complexity: 12
+
+    cyclop:
+      max-complexity: 12
+
+    funlen:
+      lines: 120
+      statements: 60
+
+    lll:
+      line-length: 140
+
+    misspell:
+      locale: US
+
+    errcheck:
+      check-type-assertions: true
+      check-blank: true
+
+    errorlint:
+      errorf: true
+      asserts: true
+      comparison: true
+
+    wrapcheck:
+      ignoreSigs:
+        - "fmt.Errorf("
+        - "errors.New("
+      ignorePackageGlobs:
+        - "testing"
+        - "net/http"
+        - "database/sql"
+
+    gosec:
+      severity: medium
+      confidence: medium
+      excludes:
+        - G104
+        - G307
+
+  exclusions:
+    # 如果你想保持 v1 的“宽松识别 generated 文件”，这里用 lax（v2 默认更严格） :contentReference[oaicite:1]{index=1}
+    generated: lax
+    warn-unused: true
+
+    # v2：exclude-rules 移到这里
+    rules:
+      - path: '_test\.go'
+        linters:
+          - dupl
+          - funlen
+          - gocyclo
+          - cyclop
+          - gosec
+          - errcheck
+      - path: '(^|.*/)internal/arch(/|$)'
+        linters:
+          - dupl
+
+    # v2：用 paths 排除目录（只是不报告 issue，仍会分析；想“跳过分析”得用 run 的 skip 配置/或拆分 invocation）
+    paths:
+      - '^(vendor|third_party|gen|generated)/'
+      - '(^|.*/)internal/arch(/|$)'
+      
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+

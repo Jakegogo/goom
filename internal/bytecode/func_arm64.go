@@ -73,7 +73,7 @@ func PrintInstf(title string, from uintptr, copyOrigin []byte, level int) {
 	}
 	logger.Important(title)
 
-	startAddr := (uint64)(from)
+	startAddr := uint64(from)
 	for pos := 0; pos < len(copyOrigin); {
 		// read 16 bytes at most each time
 		endPos := pos + 16
@@ -85,15 +85,15 @@ func PrintInstf(title string, from uintptr, copyOrigin []byte, level int) {
 		ins, err := arm64asm.Decode(code)
 		if err != nil {
 			logger.Importantf("[0] 0x%x: inst decode error:%s", startAddr+(uint64)(pos), err)
-			pos = pos + 4
+			pos += 4
 			continue
 		}
 
 		if ins.Op == 0 {
 			if code[0] == 0x00 {
-				pos = pos + 1
+				pos += 1
 			} else {
-				pos = pos + 4
+				pos += 4
 			}
 			continue
 		}
@@ -101,7 +101,7 @@ func PrintInstf(title string, from uintptr, copyOrigin []byte, level int) {
 		logger.Importantf("[%d] 0x%x:\t%s\t\t%-30s\t\t%s", 4,
 			startAddr+(uint64)(pos), ins.Op, ins.String(), hex.EncodeToString(code[:4]))
 
-		pos = pos + 4
+		pos += 4
 	}
 }
 

@@ -77,7 +77,7 @@ func NewTraceableErrorc(errStr string, cause error) error {
 }
 
 // NewTraceableError 通过 error, cause 描述创建可跟踪的错误
-func NewTraceableError(err error, cause error) error {
+func NewTraceableError(err, cause error) error {
 	return &TraceableError{
 		err:    err,
 		stacks: trace(2),

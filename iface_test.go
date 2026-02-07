@@ -25,7 +25,7 @@ func (s *ifaceMockerTestSuite) TestUnitInterfaceApply() {
 	s.Run("success", func() {
 		mock := mocker.Create()
 		// 接口变量
-		i := (I)(nil)
+		i := I(nil)
 		// 将 Mock 应用到接口变量(仅对该变量有效)
 		mock.Interface(&i).Method("Call").Apply(func(ctx *mocker.IContext, i int) int {
 			return 3
@@ -53,7 +53,7 @@ func (s *ifaceMockerTestSuite) TestUnitInterfaceReturn() {
 	s.Run("success", func() {
 		mock := mocker.Create()
 
-		i := (I)(nil)
+		i := I(nil)
 		mock.Interface(&i).Method("Call").As(func(ctx *mocker.IContext, i int) int {
 			return 0
 		}).When(1).Return(3)
@@ -83,7 +83,7 @@ func (s *ifaceMockerTestSuite) TestUnitInterfaceReturn() {
 func (s *ifaceMockerTestSuite) TestUnitInterfaceAsTwice() {
 	s.Run("success", func() {
 		mock := mocker.Create()
-		i := (I)(nil)
+		i := I(nil)
 
 		mock.Interface(&i).Method("Call").As(func(ctx *mocker.IContext, i int) int {
 			return 0
@@ -114,7 +114,7 @@ func (s *ifaceMockerTestSuite) TestUnitInterfaceAsTwice() {
 func (s *ifaceMockerTestSuite) TestUnitInterfaceApplyTwice() {
 	s.Run("success", func() {
 		mock := mocker.Create()
-		i := (I)(nil)
+		i := I(nil)
 
 		mock.Interface(&i).Method("Call").Apply(func(ctx *mocker.IContext, i int) int {
 			return 1
@@ -164,7 +164,7 @@ func (s *ifaceMockerTestSuite) TestUnitArgsNotMatch() {
 
 			mock := mocker.Create()
 			// 接口变量
-			i := (I)(nil)
+			i := I(nil)
 			// 将 Mock 应用到接口变量(仅对该变量有效)
 			mock.Interface(&i).Method("Call").Apply(func(ctx *mocker.IContext) int {
 				return 3

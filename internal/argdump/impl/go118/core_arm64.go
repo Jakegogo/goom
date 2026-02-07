@@ -165,7 +165,7 @@ func ensureCallReflectPatched() {
 // callReflectTrampolineHolder is an alias for the shared trampoline holder.
 var callReflectTrampolineHolder = shared.CallReflectTrampolineHolder
 
-func callDump(ctxt unsafe.Pointer, frame unsafe.Pointer, retValid *bool, regs unsafe.Pointer) {
+func callDump(ctxt, frame unsafe.Pointer, retValid *bool, regs unsafe.Pointer) {
 	if flags.DebugEnabled {
 		_, _ = fmt.Fprintf(os.Stderr, "[argdump] callDump entry ctxt=%p frame=%p regs=%p\n", ctxt, frame, regs)
 	}
@@ -488,6 +488,7 @@ func (a *abiSeq) stackAssign(size, alignment uintptr) {
 	a.stackBytes += size
 }
 
+// nolint
 type abiDesc struct {
 	call, ret abiSeq
 
