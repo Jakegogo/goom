@@ -1,7 +1,7 @@
-//go:build go1.24 && amd64
-// +build go1.24,amd64
+//go:build (go1.17 && !go1.18 && amd64) || (go1.18 && amd64)
+// +build go1.17,!go1.18,amd64 go1.18,amd64
 
-package go124
+package regabi
 
 import (
 	"errors"
@@ -19,10 +19,10 @@ import (
 	"github.com/tencent/goom/internal/unexports2"
 )
 
-var guardKeepAlive sync.Map // map[*patch.Guard]any
+var guardKeepAlive sync.Map // map[*patch.Guard]anyCompat
 
 // PatchFunc patches the provided function so that every call will print all arguments.
-func PatchFunc(fn interface{}) (*patch.Guard, error) {
+func PatchFunc(fn anyCompat) (*patch.Guard, error) {
 	if fn == nil {
 		return nil, errors.New("argdump: PatchFunc nil")
 	}
@@ -122,4 +122,3 @@ func PatchFuncPtr(originPtr uintptr, origFuncVal unsafe.Pointer, typ reflect.Typ
 	})
 	return guard, nil
 }
-
