@@ -2,15 +2,15 @@ package erro
 
 import "fmt"
 
-// IllegalParamType 参数类型错误异常
-type IllegalParamType struct {
+// IllegalParamTypeError 参数类型错误异常
+type IllegalParamTypeError struct {
 	paramName  string
 	paramType  string
 	expectType string
 }
 
 // Error 返回错误字符串
-func (i *IllegalParamType) Error() string {
+func (i *IllegalParamTypeError) Error() string {
 	return fmt.Sprintf("Illegal param type error, param: %s, type:%s, expect type: %s",
 		i.paramName, i.paramType, i.expectType)
 }
@@ -20,5 +20,5 @@ func (i *IllegalParamType) Error() string {
 // paramType 参数类型
 // expectType 期望类型
 func NewIllegalParamTypeError(paramName, paramType, expectType string) error {
-	return &IllegalParamType{paramName: paramName, paramType: paramType, expectType: expectType}
+	return &IllegalParamTypeError{paramName: paramName, paramType: paramType, expectType: expectType}
 }

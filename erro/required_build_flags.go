@@ -8,17 +8,17 @@ var GcFlags = NewRequiredBuildFlagsError("-gcflags=\"all=-l\"")
 // LdFlags 编译标记,取消符号压缩
 var LdFlags = NewRequiredBuildFlagsError("-ld=flags=\"-s=false\"")
 
-// RequiredBuildFlags 编译标记未找到
+// RequiredBuildFlagsError 编译标记未找到
 // 典型的比如: -gcflags="all=-l", -ldflags="-s=false"
-type RequiredBuildFlags struct {
+type RequiredBuildFlagsError struct {
 	TraceableError
 	flags []string
 }
 
 // NewRequiredBuildFlagsError 创建编译标记未找到异常
 // flags 编译、链接标记
-func NewRequiredBuildFlagsError(flags ...string) *RequiredBuildFlags {
-	return &RequiredBuildFlags{
+func NewRequiredBuildFlagsError(flags ...string) *RequiredBuildFlagsError {
+	return &RequiredBuildFlagsError{
 		flags: flags,
 		TraceableError: TraceableError{
 			errStr: "required build flags in your test command: " + flagsString(flags) + "\n" +

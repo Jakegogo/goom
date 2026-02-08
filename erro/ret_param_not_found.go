@@ -2,14 +2,14 @@ package erro
 
 import "strconv"
 
-// ReturnParamNotFound 返回值未找到异常
-type ReturnParamNotFound struct {
+// ReturnParamNotFoundError 返回值未找到异常
+type ReturnParamNotFoundError struct {
 	funcName string
 	arg      int
 }
 
 // Error 返回错误字符串
-func (e *ReturnParamNotFound) Error() string {
+func (e *ReturnParamNotFoundError) Error() string {
 	return "arg not found: " + e.funcName + ":" + strconv.Itoa(e.arg)
 }
 
@@ -17,5 +17,5 @@ func (e *ReturnParamNotFound) Error() string {
 // funcName 函数名称
 // index 返回值下标
 func NewReturnParamNotFoundError(funcName string, index int) error {
-	return &ArgNotFound{funcName: funcName, arg: index}
+	return &ArgNotFoundError{funcName: funcName, arg: index}
 }

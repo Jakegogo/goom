@@ -48,26 +48,34 @@ func I2V(objs []interface{}, types []reflect.Type, isVariadic bool) ([]reflect.V
 // toValue 转化为数值
 func toValue(r interface{}, out reflect.Type, isVariadic bool) (reflect.Value, error) {
 	v := reflect.ValueOf(r)
-	if r != nil && v.Type() != out && (out.Kind() == reflect.Struct || out.Kind() == reflect.Ptr) {
-		if v.Type().Size() != out.Size() {
-			return reflect.Value{}, fmt.Errorf("the type of the args does not match, required: %s, actual: %v", out, v.Type())
+	outKind := out.Kind()
+	isNil := r == nil
+	allowNilOut := outKind == reflect.Interface || outKind == reflect.Ptr || outKind == reflect.Slice ||
+		outKind == reflect.Map || outKind == reflect.Array || outKind == reflect.Chan
+	var vType reflect.Type
+	if !isNil {
+		vType = v.Type()
+	}
+
+	if !isNil && vType != out && (outKind == reflect.Struct || outKind == reflect.Ptr) {
+		if vType.Size() != out.Size() {
+			return reflect.Value{}, fmt.Errorf("the type of the args does not match, required: %s, actual: %v", out, vType)
 		}
 		// 类型强制转换,适用于结构体 fake 场景
 		v = cast(v, out)
 	}
 
-	if r == nil && (out.Kind() == reflect.Interface || out.Kind() == reflect.Ptr || out.Kind() == reflect.Slice ||
-		out.Kind() == reflect.Map || out.Kind() == reflect.Array || out.Kind() == reflect.Chan) {
-		v = reflect.Zero(reflect.SliceOf(out).Elem())
-	} else if v.Type().Kind() == reflect.Ptr &&
-		v.Type() == reflect.TypeOf(&iface.IContext{}) {
+	switch {
+	case isNil && allowNilOut:
+		v = reflect.Zero(out)
+	case !isNil && vType.Kind() == reflect.Ptr && vType == reflect.TypeOf(&iface.IContext{}):
 		panic("goom not support Return() API when returns mocked interface type, please use Apply() API instead.")
-	} else if r != nil && out.Kind() == reflect.Interface {
+	case !isNil && outKind == reflect.Interface:
 		ptr := reflect.New(out)
 		ptr.Elem().Set(v)
 		v = ptr.Elem()
-	} else if v.Type().Size() != out.Size() {
-		return reflect.Value{}, fmt.Errorf("the type of the args does not match, required: %s, actual: %v", out, v.Type())
+	case !isNil && vType.Size() != out.Size():
+		return reflect.Value{}, fmt.Errorf("the type of the args does not match, required: %s, actual: %v", out, vType)
 	}
 	return v, nil
 }

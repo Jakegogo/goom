@@ -1,7 +1,7 @@
 package erro
 
-// IllegalParam 参数错误异常
-type IllegalParam struct {
+// IllegalParamError 参数错误异常
+type IllegalParamError struct {
 	cause      error
 	paramName  string
 	paramValue string
@@ -9,7 +9,7 @@ type IllegalParam struct {
 }
 
 // Error 返回错误字符串
-func (i *IllegalParam) Error() (s string) {
+func (i *IllegalParamError) Error() (s string) {
 	defer func() {
 		if i.cause != nil {
 			s = s + "\ncause: " + i.cause.Error()
@@ -22,7 +22,7 @@ func (i *IllegalParam) Error() (s string) {
 }
 
 // Cause 获取错误的原因
-func (i *IllegalParam) Cause() error {
+func (i *IllegalParamError) Cause() error {
 	return i.cause
 }
 
@@ -30,14 +30,14 @@ func (i *IllegalParam) Cause() error {
 // paramName 参数名
 // paramValue 参数值
 func NewIllegalParamError(paramName string, paramValue string) error {
-	return &IllegalParam{paramName: paramName, paramValue: paramValue}
+	return &IllegalParamError{paramName: paramName, paramValue: paramValue}
 }
 
 // NewIllegalParamCError 创建参数异常
 // paramName 参数名
 // paramValue 参数值
 func NewIllegalParamCError(paramName, paramValue string, cause error) error {
-	return &IllegalParam{paramName: paramName, paramValue: paramValue, cause: cause}
+	return &IllegalParamError{paramName: paramName, paramValue: paramValue, cause: cause}
 }
 
 // NewIllegalCallError 创建参数异常
@@ -45,5 +45,5 @@ func NewIllegalParamCError(paramName, paramValue string, cause error) error {
 // paramName 参数名
 // paramValue 参数值
 func NewIllegalCallError(funcName, paramName string, paramValue string) error {
-	return &IllegalParam{funcName: funcName, paramName: paramName, paramValue: paramValue}
+	return &IllegalParamError{funcName: funcName, paramName: paramName, paramValue: paramValue}
 }

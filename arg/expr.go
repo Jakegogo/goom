@@ -67,20 +67,21 @@ type InExpr struct {
 
 // Resolve InExpr 表达式解析
 func (in *InExpr) Resolve(types []reflect.Type, isVariadic bool) error {
-	expressions := make([][]Expr, 0)
+	expressions := make([][]Expr, 0, len(in.args))
+	lastVariadicIndex := len(types) - 1
 	for i, v := range in.args {
 		param, ok := v.([]interface{})
-		if ok {
-
-		} else if isVariadic && i >= len(types)-1 {
+		switch {
+		case ok:
+		case isVariadic && i >= lastVariadicIndex:
 			// 可变参数需要展开参数数组, 为每个参数元素生成独立表达式
-			expandArgs := make([]interface{}, 0)
 			rv := reflect.ValueOf(v)
+			expandArgs := make([]interface{}, rv.Len())
 			for j := 0; j < rv.Len(); j++ {
-				expandArgs = append(expandArgs, rv.Index(j).Interface())
+				expandArgs[j] = rv.Index(j).Interface()
 			}
 			param = expandArgs
-		} else {
+		default:
 			param = []interface{}{v}
 		}
 
@@ -98,31 +99,32 @@ func (in *InExpr) Resolve(types []reflect.Type, isVariadic bool) error {
 func (in *InExpr) Eval(input []reflect.Value, isVariadic bool) (bool, error) {
 	if isVariadic {
 		// 可变参数需要展开参数数组
-		expandArgs := make([]reflect.Value, 0)
+		expandArgs := make([]reflect.Value, 0, len(input))
 		for _, v := range input {
-			rv := reflect.ValueOf(v.Interface())
-			for i := 0; i < rv.Len(); i++ {
-				expandArgs = append(expandArgs, rv.Index(i))
+			for i := 0; i < v.Len(); i++ {
+				expandArgs = append(expandArgs, v.Index(i))
 			}
 		}
 		input = expandArgs
 	}
-outer:
 	for _, one := range in.expressions {
 		if len(input) != len(one) {
 			return false, nil
 		}
+		matched := true
 		for i, param := range one {
 			v, err := param.Eval([]reflect.Value{input[i]}, isVariadic)
 			if err != nil {
 				return false, err
 			}
 			if !v {
-				continue outer
+				matched = false
+				break
 			}
 		}
-
-		return true, nil
+		if matched {
+			return true, nil
+		}
 	}
 	return false, nil
 }
