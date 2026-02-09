@@ -4,14 +4,16 @@
 package go124
 
 import (
-	"errors"
 	"reflect"
 	"unsafe"
 
+	"github.com/tencent/goom/internal/argdump/impl/shared"
 	"github.com/tencent/goom/internal/patch"
 )
 
-// Debug variables are kept for API compatibility with the arm64 implementation.
+const goVersion = "go1.24+"
+
+// Debug variables are kept for API compatibility.
 var DebugLastProxyFuncValPtr uintptr
 var DebugLastProxyCodePtr uintptr
 var DebugLastMakeFuncStubPtr uintptr
@@ -23,19 +25,15 @@ type DumpFuncImpl struct{}
 
 // MakeDumpFunc is not available on this architecture.
 func MakeDumpFunc(typ reflect.Type) interface{} {
-	panic(errors.New("argdump: MakeDumpFunc is not implemented for go1.24+ on this architecture"))
+	return shared.StubMakeDumpFunc(goVersion, typ)
 }
 
-// PatchFunc is not implemented for go1.24+ on non-arm64 yet.
+// PatchFunc is not available on this architecture.
 func PatchFunc(fn interface{}) (*patch.Guard, error) {
-	_ = fn
-	return nil, errors.New("argdump: PatchFunc is not implemented for this Go version/architecture yet")
+	return shared.StubPatchFunc(goVersion, fn)
 }
 
-// PatchFuncPtr is the go1.24+ stub for non-arm64 architectures.
+// PatchFuncPtr is not available on this architecture.
 func PatchFuncPtr(originPtr uintptr, origFuncVal unsafe.Pointer, typ reflect.Type) (*patch.Guard, error) {
-	_ = originPtr
-	_ = origFuncVal
-	_ = typ
-	return nil, errors.New("argdump: PatchFuncPtr is not implemented for this Go version/architecture yet")
+	return shared.StubPatchFuncPtr(goVersion, originPtr, origFuncVal, typ)
 }
